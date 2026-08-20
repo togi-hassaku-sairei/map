@@ -8,7 +8,7 @@ const CONFIG = {
 
   /* ① Google Apps Script のウェブアプリURL
    *    GAS をデプロイすると発行される「…/exec」で終わるURLを貼り付ける */
-  GAS_URL: "https://script.google.com/macros/s/AKfycbxpTZSQ2hVv5SOtGNWluJVNygX6CldBsuBhO_Gru-H-KaGOzaJe1zgaqJY37-1Ks2h0-g/exec",
+  GAS_URL: "https://script.google.com/macros/s/AKfycby6icmr4qB9NA4eqK1_ZUFB5dGqJdBpvJK0ooAbcFW-DZ6T_In3rb6rvf7z5RlWoob9lA/exec",
 
   /* ② 地図の自動更新間隔（ミリ秒）… 30秒 = 30000 */
   REFRESH_INTERVAL: 30000,
