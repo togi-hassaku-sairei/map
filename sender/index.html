@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>神輿GPS 緊急送信</title>
+<style>
+  :root{ --ai:#1f3a5f; --shu:#d7402b; --ok:#2e7d32; --ng:#c62828; --warn:#b05a00; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:var(--ai); color:#fff; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; padding:16px; }
+  h1{ font-size:19px; letter-spacing:.08em; margin:6px 0 2px; }
+  .tag{ background:var(--shu); font-size:12px; font-weight:800; padding:3px 10px; border-radius:999px; }
+  .warn{ background:#fff3e0; color:var(--warn); border:2px solid var(--warn); border-radius:10px;
+    padding:12px; font-size:13px; font-weight:700; max-width:440px; margin:12px 0; line-height:1.7; }
+  .card{ width:100%; max-width:440px; background:#fff; color:#222; border-radius:14px; padding:18px;
+    box-shadow:0 6px 20px rgba(0,0,0,.3); }
+  label{ font-size:13px; font-weight:700; display:block; margin-bottom:6px; }
+  input,select{ width:100%; font-size:18px; padding:13px; border:2px solid #ccc; border-radius:10px; background:#fff; margin-bottom:14px; }
+  select option:disabled{ color:#bbb; }
+  .btns{ display:flex; gap:10px; }
+  button{ flex:1; font-size:18px; font-weight:800; padding:17px 0; border:none; border-radius:12px; color:#fff; cursor:pointer; }
+  #startBtn{ background:var(--shu); } #stopBtn{ background:#777; } button:disabled{ opacity:.4; }
+  #status{ margin-top:15px; padding:15px; border-radius:10px; font-size:16px; font-weight:800; text-align:center; background:#eee; color:#333; }
+  #status.on{ background:#e8f5e9; color:var(--ok); } #status.err{ background:#ffebee; color:var(--ng); }
+  .big{ font-size:26px; display:block; margin-bottom:4px; }
+  #log{ margin-top:12px; font-size:12px; color:#555; max-height:140px; overflow:auto; background:#f6f6f6; border-radius:8px; padding:10px; line-height:1.6; }
+</style>
+</head>
+<body>
+  <h1>🏮 神輿GPS <span class="tag">緊急用</span></h1>
+  <div class="warn">
+    ⚠ これは端末が足りない/故障したときの<strong>予備</strong>です。<br>
+    <strong>画面を消す・別アプリに切替・スリープにすると送信が止まります。</strong><br>
+    使うときは「充電しながら・画面をつけたまま」でお願いします。
+  </div>
+
+  <div class="card">
+    <label for="mikoshiSelect">この端末で送る神輿</label>
+    <select id="mikoshiSelect"></select>
+
+    <label for="keyInput">書き込みキー</label>
+    <input id="keyInput" type="text" placeholder="合言葉を入力" autocomplete="off">
+
+    <div class="btns">
+      <button id="startBtn">送信開始</button>
+      <button id="stopBtn" disabled>停止</button>
+    </div>
+    <div id="status"><span class="big">⏸</span>待機中</div>
+    <div id="log"></div>
+  </div>
+
+<script src="../js/config.js?v=9"></script>
+<script>
+  const $=(id)=>document.getElementById(id);
+  const sel=$("mikoshiSelect");
+  const SEND_INTERVAL=30000;   // 30秒ごと送信
+  const CLAIM_SEC=180;         // 使用中とみなす秒数（Code.gs CLAIM_TIMEOUT_SEC と同じ）
+
+  let TOKEN=localStorage.getItem("deviceToken");
+  if(!TOKEN){ TOKEN="d-"+Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem("deviceToken",TOKEN); }
+  $("keyInput").value=localStorage.getItem("sendKey")||"";
+
+  let watchId=null,timer=null,lastPos=null,wakeLock=null;
+
+  function setStatus(mark,msg,cls){ const s=$("status"); s.className=cls||""; s.innerHTML='<span class="big">'+mark+'</span>'+msg; }
+  function log(msg){ const t=new Date().toLocaleTimeString("ja-JP"); $("log").innerHTML="["+t+"] "+msg+"<br>"+$("log").innerHTML; }
+
+  async function buildOptions(){
+    let list=[]; try{ list=await loadRoster(); }catch(e){}
+    if(!list||!list.length) list=CONFIG.MIKOSHI.slice();
+    sel.innerHTML="";
+    list.forEach(m=>{ const o=document.createElement("option"); o.value=m.id; o.textContent=m.id+" ： "+m.name; sel.appendChild(o); });
+    const saved=localStorage.getItem("mikoshiId"); if(saved&&list.some(m=>m.id===saved)) sel.value=saved;
+    refreshTaken();
+  }
+  async function refreshTaken(){
+    if(watchId!==null) return;
+    try{
+      const j=await (await fetch(CONFIG.GAS_URL+(CONFIG.GAS_URL.includes("?")?"&":"?")+"_="+Date.now())).json();
+      const now=j.server||Date.now(); const taken={};
+      (j.mikoshi||[]).forEach(d=>{ if(d.src==="manual" && d.updated && (now-d.updated)/1000<CLAIM_SEC) taken[d.id]=true; });
+      const own=localStorage.getItem("mikoshiId");
+      [...sel.options].forEach(o=>{ const m=CONFIG.MIKOSHI.find(x=>x.id===o.value); const base=o.value+" ： "+(m?m.name:"");
+        if(taken[o.value]&&o.value!==own){ o.textContent=base+"（他端末が送信中）"; o.disabled=true; } else { o.textContent=base; o.disabled=false; } });
+    }catch(e){}
+  }
+  async function reqWake(){ try{ if("wakeLock" in navigator) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){} }
+  document.addEventListener("visibilitychange",()=>{ if(wakeLock!==null&&document.visibilityState==="visible") reqWake(); });
+
+  async function start(){
+    if(!("geolocation" in navigator)){ setStatus("⚠","この端末はGPS非対応です","err"); return; }
+    if(!$("keyInput").value.trim()){ setStatus("⚠","書き込みキーを入力してください","err"); return; }
+    if(sel.selectedOptions[0]&&sel.selectedOptions[0].disabled){ setStatus("⚠","この神輿は別の端末が送信中です","err"); return; }
+    localStorage.setItem("mikoshiId",sel.value); localStorage.setItem("sendKey",$("keyInput").value.trim());
+    sel.disabled=true; $("keyInput").disabled=true; $("startBtn").disabled=true; $("stopBtn").disabled=false;
+    setStatus("📡","GPSを取得しています…",""); await reqWake();
+    watchId=navigator.geolocation.watchPosition(
+      p=>{ lastPos=p; setStatus("🟢","送信中（画面はつけたまま）±"+Math.round(p.coords.accuracy)+"m","on"); },
+      err=>{ setStatus("⚠","GPSエラー："+err.message,"err"); },
+      { enableHighAccuracy:true, maximumAge:10000, timeout:20000 });
+    send(); timer=setInterval(send,SEND_INTERVAL);
+  }
+  function stop(){
+    if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+    if(timer) clearInterval(timer);
+    if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+    watchId=timer=null; sel.disabled=false; $("keyInput").disabled=false; $("startBtn").disabled=false; $("stopBtn").disabled=true;
+    setStatus("⏸","停止しました",""); refreshTaken();
+  }
+  function onBlocked(){ stop(); setStatus("🚫","この神輿は別の端末が送信中です","err"); log("送信拒否：別端末が使用中"); }
+
+  function send(){
+    if(!lastPos){ log("まだ位置が取れていません"); return; }
+    const m=CONFIG.MIKOSHI.find(x=>x.id===sel.value);
+    const body=JSON.stringify({ action:"send", key:$("keyInput").value.trim(), token:TOKEN,
+      id:sel.value, name:m?m.name:"", lat:lastPos.coords.latitude, lng:lastPos.coords.longitude });
+    fetch(CONFIG.GAS_URL,{method:"POST",body:body}).then(async r=>{
+      let d={}; try{ d=await r.json(); }catch(_){ log("送信しました（応答確認できず）"); return; }
+      if(d.ok) log("送信成功");
+      else if(d.error==="in_use") onBlocked();
+      else if(d.error==="auth") { stop(); setStatus("⚠","書き込みキーが違います","err"); }
+      else log("サーバー応答："+(d.error||"不明"));
+    }).catch(e=>log("通信エラー："+e.message));
+  }
+  $("startBtn").onclick=start; $("stopBtn").onclick=stop;
+  buildOptions(); setInterval(refreshTaken,15000);
+</script>
+</body>
+</html>

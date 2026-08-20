@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>神輿 運行記録（過去のルート）</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{ --ai:#1b2f52; --shu:#d7402b; --paper:#f7f3ea; --line:#e4ddcd; --ink:#20242b; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{ font-family:system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:var(--ink);
+    background:var(--paper); overflow:hidden; display:flex; flex-direction:column; }
+
+  .topbar{ background:var(--ai); color:#fff; border-bottom:3px solid var(--shu);
+    padding:8px 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:0 0 auto; }
+  .topbar .title{ font-weight:800; font-size:16px; margin-right:6px; }
+  .topbar label{ font-size:12px; opacity:.9; }
+  select{ font-size:14px; padding:7px 8px; border-radius:8px; border:1px solid #ccc; background:#fff; color:#222; }
+  .btn{ font-size:14px; font-weight:800; padding:8px 14px; border:none; border-radius:8px;
+    background:var(--shu); color:#fff; cursor:pointer; }
+  .btn.sub{ background:#5a6b86; }
+
+  .play{ display:flex; align-items:center; gap:8px; width:100%; margin-top:4px; }
+  .play input[type=range]{ flex:1; }
+  .clock{ font-variant-numeric:tabular-nums; font-size:13px; min-width:150px; }
+
+  .wrap{ position:relative; flex:1 1 auto; min-height:0; }
+  #map{ position:absolute; inset:0; background:#dfe6ea; }
+
+  .statsBtn{ position:absolute; right:10px; top:56px; z-index:1000; background:var(--ai); color:#fff;
+    border:2px solid rgba(255,255,255,.6); border-radius:999px; padding:10px 16px; font-weight:800; font-size:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,.3); cursor:pointer; }
+  .stats{ position:absolute; right:10px; top:102px; z-index:1000; width:min(360px,92vw); max-height:64%;
+    overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.25);
+    padding:10px; display:none; }
+  .stats.open{ display:block; }
+  .stats h3{ margin:4px 0 8px; font-size:14px; color:var(--ai); }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ padding:6px 6px; border-bottom:1px solid #eee; font-size:12px; text-align:right; }
+  th:first-child,td:first-child{ text-align:left; }
+  .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+  .msg{ position:absolute; right:10px; top:10px; left:auto; z-index:1000; background:#fff; border-radius:8px;
+    padding:8px 12px; font-size:13px; box-shadow:0 2px 8px rgba(0,0,0,.2); max-width:60%; text-align:right; }
+
+  .mk{ width:30px;height:30px;border-radius:50%;border:3px solid #fff;overflow:hidden;background:#fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.5); }
+  .mk img{ width:100%;height:100%;object-fit:contain; }
+  .leaflet-popup-content{ font-size:13px; }
+
+  /* 地図レイヤー切替（左上・縮尺の下） */
+  .layer-btn{ position:absolute; left:10px; top:78px; z-index:1100;
+    width:42px; height:42px; border-radius:12px; background:#fff; color:var(--ai);
+    border:2px solid var(--ai); font-size:19px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,.28); }
+  .layer-btn.on{ background:var(--ai); color:#fff; }
+  .layer-panel{ position:absolute; left:60px; top:78px; z-index:1200; background:#fff;
+    border:1px solid var(--line); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.28);
+    overflow:hidden; display:none; min-width:160px; }
+  .layer-panel.open{ display:block; }
+  .layer-opt{ display:flex; align-items:center; gap:8px; width:100%; padding:13px 15px; border:none;
+    background:#fff; cursor:pointer; font-size:15px; font-weight:700; color:var(--ink); text-align:left;
+    border-bottom:1px solid #eee; }
+  .layer-opt:last-child{ border-bottom:none; }
+  .layer-opt .chk{ width:16px; color:var(--shu); font-weight:900; }
+  .layer-opt.sel{ background:#f3f6fb; color:var(--ai); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="title">🗺 神輿 運行記録</span>
+    <label>年度</label><select id="yearSel"></select>
+    <label>神輿</label><select id="mikoshiSel"><option value="">すべて</option></select>
+    <button class="btn" id="playBtn">▶ 再生</button>
+    <label>速さ</label>
+    <select id="speedSel">
+      <option value="60000">ゆっくり</option>
+      <option value="30000" selected>ふつう</option>
+      <option value="15000">はやい</option>
+    </select>
+    <div class="play">
+      <input type="range" id="slider" min="0" max="1000" value="1000">
+      <span class="clock" id="clock">全ルート表示中</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="map"></div>
+    <div class="msg" id="msg">読み込み中…</div>
+    <button class="statsBtn" id="statsBtn">📊 集計</button>
+    <div class="stats" id="stats"><h3>神輿ごとの運行集計</h3><div id="statsBody"></div></div>
+    <button class="layer-btn" id="layerBtn" aria-label="地図の種類を切り替え">🗺️</button>
+    <div class="layer-panel" id="layerPanel">
+      <button class="layer-opt sel" data-base="std"><span class="chk">✓</span>標準地図</button>
+      <button class="layer-opt" data-base="photo"><span class="chk"></span>航空写真</button>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/config.js?v=7"></script>
+<script>
+  const $=(id)=>document.getElementById(id);
+  const map=L.map("map").setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+  const baseLayers={
+    std:L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}),
+    photo:L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",{maxZoom:18,attribution:"地理院タイル（シームレス空中写真）"})
+  };
+  let currentBase="std"; baseLayers.std.addTo(map);
+  function switchBase(k){ if(k===currentBase) return; map.removeLayer(baseLayers[currentBase]); baseLayers[k].addTo(map); baseLayers[k].bringToBack(); currentBase=k; }
+  (function(){
+    const btn=$("layerBtn"), panel=$("layerPanel"); if(!btn||!panel) return;
+    function checks(){ panel.querySelectorAll(".layer-opt").forEach(function(op){ const on=op.dataset.base===currentBase; op.classList.toggle("sel",on); op.querySelector(".chk").textContent=on?"✓":""; }); }
+    function open(o){ panel.classList.toggle("open",o); btn.classList.toggle("on",o); }
+    btn.addEventListener("click",function(e){ e.stopPropagation(); open(!panel.classList.contains("open")); checks(); });
+    panel.querySelectorAll(".layer-opt").forEach(function(op){ op.addEventListener("click",function(e){ e.stopPropagation(); switchBase(op.dataset.base); checks(); open(false); }); });
+    map.on("click",function(){ open(false); }); document.addEventListener("click",function(){ open(false); }); checks();
+  })();
+
+  const colorOf=(id)=>{ const m=CONFIG.MIKOSHI.find(x=>x.id===id); return m?m.color:"#3366cc"; };
+  const nameOf =(id)=>{ const m=CONFIG.MIKOSHI.find(x=>x.id===id); return m?m.name:id; };
+  const iconOf =(id)=>{ const m=CONFIG.MIKOSHI.find(x=>x.id===id); return (m&&m.icon)?("../"+m.icon):""; };
+
+  let routes={};          // id -> [{lat,lng,t}]
+  let layers=[];          // 描画中のLeafletレイヤ
+  let moveMarkers={};     // id -> 再生用マーカー
+  let trailLines={};      // id -> 再生で通った軌跡ライン
+  let tMin=0,tMax=0, playing=false, playTimer=null;
+
+  function clearLayers(){ layers.forEach(l=>map.removeLayer(l)); layers=[];
+    Object.values(moveMarkers).forEach(m=>map.removeLayer(m)); moveMarkers={};
+    Object.values(trailLines).forEach(l=>map.removeLayer(l)); trailLines={}; }
+
+  function haversine(a,b){
+    const R=6371000, toR=x=>x*Math.PI/180;
+    const dLat=toR(b.lat-a.lat), dLng=toR(b.lng-a.lng);
+    const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.sqrt(s));
+  }
+  function clock(t){ return new Date(t).toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+
+  // 年度一覧を取得
+  async function loadYears(){
+    try{
+      const j=await (await fetch(CONFIG.GAS_URL+"?type=years&_="+Date.now())).json();
+      const sel=$("yearSel"); sel.innerHTML="";
+      if(!j.years || !j.years.length){ $("msg").textContent="まだ履歴がありません（祭り開催後に記録されます）"; return; }
+      j.years.forEach(y=>{ const o=document.createElement("option"); o.value=y; o.textContent=y+"年"; sel.appendChild(o); });
+      sel.value=j.years[j.years.length-1];   // 最新年度
+      loadYear(sel.value);
+    }catch(e){ $("msg").textContent="年度の取得に失敗しました："+e.message; }
+  }
+
+  // 神輿プルダウン
+  CONFIG.MIKOSHI.forEach(m=>{ const o=document.createElement("option"); o.value=m.id; o.textContent=m.name; $("mikoshiSel").appendChild(o); });
+
+  // 指定年度の履歴を取得して描画
+  async function loadYear(year){
+    stopPlay();
+    $("msg").textContent=year+"年の記録を読み込み中…";
+    try{
+      const j=await (await fetch(CONFIG.GAS_URL+"?type=history&year="+encodeURIComponent(year)+"&_="+Date.now())).json();
+      routes={};
+      j.points.forEach(p=>{
+        const id=p[0], lat=p[1], lng=p[2], t=new Date(String(p[3]).replace(/-/g,"/")).getTime();
+        if(!isFinite(lat)||!isFinite(lng)||!isFinite(t)) return;
+        (routes[id]=routes[id]||[]).push({lat,lng,t});
+      });
+      Object.values(routes).forEach(arr=>arr.sort((a,b)=>a.t-b.t));
+      draw();
+    }catch(e){ $("msg").textContent="履歴の取得に失敗しました："+e.message; }
+  }
+
+  function selectedIds(){
+    const one=$("mikoshiSel").value;
+    const ids=Object.keys(routes).filter(id=>routes[id].length>1);
+    return one? ids.filter(id=>id===one) : ids;
+  }
+
+  function draw(){
+    clearLayers();
+    const ids=selectedIds();
+    if(!ids.length){ $("msg").textContent="この年度の記録がありません"; $("statsBody").innerHTML=""; return; }
+    const all=[]; tMin=Infinity; tMax=-Infinity;
+    const rows=[];
+    ids.forEach(id=>{
+      const arr=routes[id]; const col=colorOf(id);
+      const latlngs=arr.map(p=>[p.lat,p.lng]);
+      // 経路をつなぐ細い線（うっすら）
+      layers.push(L.polyline(latlngs,{color:col,weight:2,opacity:.28}).addTo(map));
+      // 足跡（約45mごとに点を置く）
+      const spacing=45; let acc=spacing, dist=0;
+      for(let i=0;i<arr.length;i++){
+        if(i>0){ const d=haversine(arr[i-1],arr[i]); if(d<300){ dist+=d; acc+=d; } }
+        if(acc>=spacing){
+          acc=0;
+          layers.push(L.circleMarker([arr[i].lat,arr[i].lng],
+            {radius:4,color:"#fff",weight:1,fillColor:col,fillOpacity:.9}).addTo(map));
+        }
+        all.push([arr[i].lat,arr[i].lng]);
+      }
+      const s=arr[0], e=arr[arr.length-1];
+      layers.push(L.circleMarker([s.lat,s.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2e7d32",fillOpacity:1}).addTo(map).bindPopup(nameOf(id)+"：出発 "+clock(s.t)));
+      layers.push(L.circleMarker([e.lat,e.lng],{radius:7,color:"#c62828",weight:3,fillColor:"#fff",fillOpacity:1}).addTo(map).bindPopup(nameOf(id)+"：終点 "+clock(e.t)));
+      tMin=Math.min(tMin,s.t); tMax=Math.max(tMax,e.t);
+      const hours=(e.t-s.t)/3600000;
+      rows.push({id,dist,hours,pts:arr.length});
+    });
+    if(all.length) map.fitBounds(all,{padding:[40,40]});
+    renderStats(rows);
+    $("msg").textContent = ($("mikoshiSel").value? nameOf($("mikoshiSel").value) : ids.length+"基") + " の運行ルート";
+    $("slider").value=1000; $("clock").textContent="全ルート表示中";
+    Object.values(moveMarkers).forEach(m=>map.removeLayer(m)); moveMarkers={};
+  }
+
+  function renderStats(rows){
+    rows.sort((a,b)=>b.dist-a.dist);
+    let html='<table><tr><th>神輿</th><th>距離</th><th>時間</th><th>平均</th></tr>';
+    rows.forEach(r=>{
+      const km=(r.dist/1000).toFixed(2);
+      const hm=Math.floor(r.hours)+"時間"+Math.round((r.hours%1)*60)+"分";
+      const spd=r.hours>0?(r.dist/1000/r.hours).toFixed(1):"—";
+      html+='<tr><td><span class="dot" style="background:'+colorOf(r.id)+'"></span>'+nameOf(r.id)+'</td>'+
+            '<td>'+km+'km</td><td>'+hm+'</td><td>'+spd+'km/h</td></tr>';
+    });
+    html+='</table>';
+    $("statsBody").innerHTML=html;
+  }
+
+  // ---- 再生 ----
+  function crestIcon(id){ return L.divIcon({className:"",html:'<div class="mk"><img src="'+iconOf(id)+'"></div>',iconSize:[30,30],iconAnchor:[15,15]}); }
+  function bsearchLE(arr,t){ let lo=0,hi=arr.length-1,ans=0; while(lo<=hi){const m=(lo+hi)>>1; if(arr[m].t<=t){ans=m;lo=m+1;}else hi=m-1;} return ans; }
+
+  function setTime(frac){
+    if(!isFinite(tMin)||tMax<=tMin) return;
+    const t=tMin+frac*(tMax-tMin);
+    $("clock").textContent=clock(t);
+    selectedIds().forEach(id=>{
+      const arr=routes[id];
+      if(t<arr[0].t){
+        if(moveMarkers[id]){ map.removeLayer(moveMarkers[id]); delete moveMarkers[id]; }
+        if(trailLines[id]){ map.removeLayer(trailLines[id]); delete trailLines[id]; }
+        return;
+      }
+      const idx=bsearchLE(arr,t);
+      const p=arr[idx];
+      // 現在位置マーカー
+      if(!moveMarkers[id]) moveMarkers[id]=L.marker([p.lat,p.lng],{icon:crestIcon(id),zIndexOffset:1000}).addTo(map).bindPopup(nameOf(id));
+      else moveMarkers[id].setLatLng([p.lat,p.lng]);
+      // 通ってきた軌跡（出発〜現在位置まで）を伸ばす
+      const seg=[]; for(let k=0;k<=idx;k++) seg.push([arr[k].lat,arr[k].lng]);
+      if(seg.length>=2){
+        if(!trailLines[id]) trailLines[id]=L.polyline(seg,{color:colorOf(id),weight:5,opacity:.95}).addTo(map);
+        else trailLines[id].setLatLngs(seg);
+      } else if(trailLines[id]){ map.removeLayer(trailLines[id]); delete trailLines[id]; }
+    });
+  }
+
+  function startPlay(){
+    if(!isFinite(tMin)||tMax<=tMin) return;
+    playing=true; $("playBtn").textContent="⏸ 一時停止"; $("playBtn").classList.add("sub");
+    const dur=Number($("speedSel").value); const step=50/dur;
+    let frac=Number($("slider").value)/1000; if(frac>=1) frac=0;
+    playTimer=setInterval(()=>{
+      frac+=step; if(frac>=1){ frac=1; }
+      $("slider").value=Math.round(frac*1000); setTime(frac);
+      if(frac>=1) stopPlay();
+    },50);
+  }
+  function stopPlay(){ playing=false; if(playTimer) clearInterval(playTimer); playTimer=null;
+    $("playBtn").textContent="▶ 再生"; $("playBtn").classList.remove("sub"); }
+
+  // ---- イベント ----
+  $("yearSel").onchange=()=>loadYear($("yearSel").value);
+  $("mikoshiSel").onchange=draw;
+  $("slider").oninput=()=>{ stopPlay(); setTime(Number($("slider").value)/1000); };
+  $("playBtn").onclick=()=>{ playing?stopPlay():startPlay(); };
+  $("statsBtn").onclick=()=>$("stats").classList.toggle("open");
+
+  loadYears();
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>冨木八朔祭礼デジタルマップ</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="./css/style.css?v=16" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">冨木八朔祭礼デジタルマップ</div>
+  <button class="info-btn" id="infoBtn" aria-label="表示についての注意">ⓘ</button>
+</header>
+<div class="info-bubble" id="infoBubble">※キリコ・神輿等の位置はGPS情報をもとに表示しています。通信状況等により、実際の位置や更新時刻と差が生じる場合があります。</div>
+
+  <div class="layout">
+    <div id="map"></div>
+
+    <aside class="panel" id="panel">
+      <div class="panel-head">
+        <div class="search">
+          <input id="search" type="search" placeholder="地区名で検索（例：森之内（本社））" autocomplete="off">
+        </div>
+      </div>
+      <ul class="list" id="list"></ul>
+      <div class="panel-note">※キリコ・神輿等の位置はGPS情報をもとに表示しています。通信状況等により、実際の位置や更新時刻と差が生じる場合があります。</div>
+      <div class="panel-foot" id="foot">最終取得：--</div>
+    </aside>
+
+    <button class="panel-toggle" id="panelToggle" aria-label="神輿検索の表示切替">🔍 キリコ・神輿等検索 ▲</button>
+    <button class="locate-btn" id="locateBtn" aria-label="現在地を表示">📍</button>
+    <button class="layer-btn" id="layerBtn" aria-label="地図の種類を切り替え">🗺️</button>
+    <div class="layer-panel" id="layerPanel" role="menu" aria-label="地図の種類">
+      <button class="layer-opt sel" data-base="std" role="menuitemradio"><span class="chk">✓</span>標準地図</button>
+      <button class="layer-opt" data-base="photo" role="menuitemradio"><span class="chk"></span>航空写真</button>
+    </div>
+
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./js/config.js?v=12"></script>
+<script src="./js/map.js?v=17"></script>
+</body>
+</html>

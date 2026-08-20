@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>神輿トラッカー 管理</title>
+<style>
+  :root{ --ai:#1b2f52; --shu:#d7402b; --ok:#2e7d32; --off:#9e9e9e; --ng:#c62828; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:#f2efe6; color:#222; padding:16px; max-width:760px; margin-inline:auto; }
+  h1{ font-size:19px; color:var(--ai); margin:4px 0 16px; }
+
+  /* パスワード欄 */
+  .panel{ background:#fff; border:1px solid #e4ddcd; border-radius:12px; padding:16px; margin-bottom:14px; }
+  .lbl{ display:block; font-size:14px; font-weight:800; color:var(--ai); margin-bottom:6px; }
+  #pw{ width:100%; font-size:16px; padding:12px; border:2px solid #ccc; border-radius:8px; }
+  #pw.bad{ border-color:var(--ng); background:#fff5f5; }
+  .hint{ font-size:12px; color:#777; margin-top:8px; line-height:1.6; }
+
+  /* 大きな通知バナー */
+  .alert{ font-size:15px; font-weight:800; padding:14px 16px; border-radius:10px; margin-bottom:14px;
+    border-left:6px solid; }
+  .alert.err{ background:#ffe9e9; color:var(--ng); border-color:var(--ng); }
+  .alert.ok{  background:#e7f6ea; color:var(--ok); border-color:var(--ok); }
+  .alert.info{ background:#eef2f8; color:var(--ai); border-color:var(--ai); }
+
+  /* 一覧見出し */
+  .listhead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 4px; }
+  .listhead .ttl{ font-size:14px; font-weight:800; color:#555; }
+  #refresh{ font-size:13px; font-weight:700; padding:9px 14px; border:none; border-radius:8px;
+    background:var(--ai); color:#fff; cursor:pointer; }
+  .hint2{ font-size:12px; color:#888; margin-bottom:10px; line-height:1.6; }
+
+  table{ width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden;
+    border:1px solid #e4ddcd; }
+  th,td{ text-align:left; padding:11px 12px; border-bottom:1px solid #eee; font-size:14px; }
+  th{ background:#f7f4ec; font-size:12px; color:#666; }
+  tr:last-child td{ border-bottom:none; }
+  .badge{ font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; }
+  .ok{ background:#e6f4ea; color:var(--ok); } .offb{ background:#eee; color:#616161; }
+  .non{ background:#f3ede0; color:#a99; }
+  button.del{ font-size:13px; font-weight:700; padding:8px 14px; border:none; border-radius:8px;
+    background:var(--ng); color:#fff; cursor:pointer; }
+
+  /* 参加・並び順 */
+  .rosterHead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 4px; }
+
+  /* 紹介文・画像の編集 */
+  #introList{ margin-bottom:18px; }
+  .introItem{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .introName{ font-weight:800; font-size:14px; color:var(--ai); margin-bottom:8px; }
+  .introId{ font-size:11px; color:#999; font-weight:400; }
+  .introItem textarea, .introItem input[type=text]{
+    width:100%; box-sizing:border-box; font-size:14px; padding:8px 10px;
+    border:1px solid #ccc; border-radius:8px; margin-bottom:8px; font-family:inherit; }
+  .introPrev img{ width:100%; max-width:280px; height:120px; object-fit:cover; border-radius:8px; background:#eee; }
+  .save{ background:#2e7d32 !important; }
+  .roster{ list-style:none; margin:0 0 20px; padding:0; background:#fff; border:1px solid var(--line);
+    border-radius:10px; overflow:hidden; }
+  .ritem{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid #eee; }
+  .ritem:last-child{ border-bottom:none; }
+  .ritem.off{ opacity:.5; background:#faf7f0; }
+  .ritem .nm{ flex:1; font-weight:700; font-size:14px; }
+  .ritem .id{ font-size:11px; color:#999; font-weight:400; }
+  .ritem label{ font-size:12px; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+  .ritem input[type=checkbox]{ width:20px; height:20px; }
+  .ord{ display:flex; flex-direction:column; gap:3px; }
+  .ord button{ background:#5a6b86; color:#fff; border:none; border-radius:5px; width:32px; height:20px;
+    font-size:11px; line-height:1; cursor:pointer; padding:0; }
+  .ord button:disabled{ opacity:.3; }
+  .rswatch{ width:16px; height:16px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; flex:none; }
+</style>
+</head>
+<body>
+  <h1>🛠 神輿トラッカー 管理画面</h1>
+
+  <div class="panel">
+    <label class="lbl" for="pw">管理パスワード</label>
+    <input id="pw" type="password" placeholder="ここに管理パスワードを入力" autocomplete="off">
+    <div class="hint">神輿データを「削除」するときに使います。このパスワードは端末に保存されません（画面を閉じると消えます）。</div>
+  </div>
+
+  <div class="alert info" id="alert">パスワードを入力し、削除したい神輿の行の「削除」を押してください。</div>
+
+  <div class="rosterHead">
+    <span class="ttl">参加地区の設定（この年の参加・並び順）</span>
+    <button id="saveRoster" class="save">この設定を保存</button>
+  </div>
+  <div class="hint2">チェックを外すと非表示（不参加）になります。▲▼で並び順を変更できます。変更したら「この設定を保存」を押してください（管理パスワードが必要）。地図・送信ページに反映されます。</div>
+  <ul class="roster" id="rosterList"></ul>
+
+  <div class="rosterHead">
+    <span class="ttl">紹介文・画像の編集（地区ごと）</span>
+    <button id="saveIntro" class="save">紹介文・画像を保存</button>
+  </div>
+  <div class="hint2">
+    各地区の紹介文と画像URLを入力し「保存」を押すと、地図のポップアップに表示されます（管理パスワードが必要・GitHubの操作は不要）。<br>
+    <b>画像はGoogleドライブの共有リンクを貼り付けるだけでOK</b>（自動で表示用に変換します）。ドライブ側で画像を右クリック →「共有」→「リンクを知っている全員」を<b>閲覧可</b>にしてください（非公開だと表示されません）。
+  </div>
+  <div id="introList"></div>
+
+  <div class="listhead">
+    <span class="ttl">神輿の受信状況</span>
+    <button id="refresh">🔄 状態を再読み込み</button>
+  </div>
+  <div class="hint2">一覧は15秒ごとに自動で最新化されます。「再読み込み」は、今すぐ最新状況を取り込みたいときに押すボタンです。</div>
+
+  <table>
+    <thead><tr><th>神輿</th><th>状態</th><th>最終更新</th><th>操作</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+<script src="../js/config.js?v=7"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const state = {};
+  let serverTime = 0;
+
+  function setAlert(msg, kind){                 // kind: 'err' | 'ok' | 'info'
+    const a = $("alert");
+    a.className = "alert " + (kind || "info");
+    a.textContent = msg;
+  }
+  function ago(sec){
+    if (sec < 60) return Math.floor(sec) + "秒前";
+    if (sec < 3600) return Math.floor(sec/60) + "分前";
+    return Math.floor(sec/3600) + "時間前";
+  }
+
+  async function load(){
+    try{
+      const url = CONFIG.GAS_URL + (CONFIG.GAS_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+      const j = await (await fetch(url)).json();
+      serverTime = j.server || Date.now();
+      (j.mikoshi || []).forEach(d => state[d.id] = d);
+      render();
+    }catch(e){ setAlert("状態の取得に失敗しました：" + e.message, "err"); }
+  }
+
+  function render(){
+    const tb = $("tbody"); tb.innerHTML = "";
+    CONFIG.MIKOSHI.forEach(m => {
+      const d = state[m.id];
+      let stTxt, cls, upd = "―";
+      if (!d || !d.updated){ stTxt = "未受信"; cls = "non"; }
+      else {
+        const sec = (serverTime - d.updated)/1000;
+        const off = sec > CONFIG.OFFLINE_SEC;
+        stTxt = off ? "通信断" : "正常"; cls = off ? "offb" : "ok"; upd = ago(sec);
+      }
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td><b>" + m.id + "</b>　" + m.name + "</td>" +
+        '<td><span class="badge ' + cls + '">' + stTxt + "</span></td>" +
+        "<td>" + upd + "</td>" +
+        '<td><button class="del" data-id="' + m.id + '">削除</button></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll("button.del").forEach(b => b.onclick = () => del(b.dataset.id));
+  }
+
+  async function del(id){
+    const pwEl = $("pw");
+    const pw = pwEl.value.trim();
+    if (!pw){
+      pwEl.classList.add("bad"); pwEl.focus();
+      setAlert("⚠ 先に管理パスワードを入力してください（上の入力欄）", "err");
+      return;
+    }
+    pwEl.classList.remove("bad");
+    const m = CONFIG.MIKOSHI.find(x => x.id === id);
+    if (!confirm("「" + (m ? m.name : id) + "」の位置データを削除します。よろしいですか？")) return;
+    setAlert("削除中…", "info");
+    try{
+      const body = JSON.stringify({ action:"delete", adminKey: pw, id: id });
+      const j = await (await fetch(CONFIG.GAS_URL, { method:"POST", body })).json();
+      if (j.ok){
+        delete state[id];
+        setAlert("✅ 削除しました：" + (m ? m.name : id), "ok");
+        load();
+      } else if (j.error === "admin_auth"){
+        pwEl.classList.add("bad"); pwEl.focus();
+        setAlert("⚠ 管理パスワードが違います", "err");
+      } else {
+        setAlert("エラー：" + (j.error || "不明"), "err");
+      }
+    }catch(e){ setAlert("通信エラー：" + e.message, "err"); }
+  }
+
+  $("pw").addEventListener("input", () => $("pw").classList.remove("bad"));
+  $("refresh").onclick = () => { setAlert("最新の状態を取り込みました", "info"); load(); };
+  load();
+  setInterval(load, 15000);
+
+  /* ===== 参加・並び順の設定 ===== */
+  let roster = [];   // [{id,name,color,icon,active,order}]
+
+  async function loadRosterAdmin(){
+    roster = await loadRosterFull();   // config(色/紋) + サーバー(参加/順番) を統合
+    renderRoster();
+  }
+  function renderRoster(){
+    const ul = $("rosterList"); ul.innerHTML = "";
+    roster.forEach((m, i) => {
+      const li = document.createElement("li");
+      li.className = "ritem" + (m.active ? "" : " off");
+      li.innerHTML =
+        '<div class="ord">' +
+          '<button data-up="' + i + '" ' + (i===0 ? "disabled" : "") + '>▲</button>' +
+          '<button data-down="' + i + '" ' + (i===roster.length-1 ? "disabled" : "") + '>▼</button>' +
+        '</div>' +
+        '<span class="rswatch" style="background:' + m.color + '"></span>' +
+        '<span class="nm">' + m.name + ' <span class="id">' + m.id + '</span></span>' +
+        '<label><input type="checkbox" data-chk="' + i + '" ' + (m.active ? "checked" : "") + '> 参加</label>';
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll("[data-up]").forEach(b => b.onclick = () => moveRow(+b.dataset.up, -1));
+    ul.querySelectorAll("[data-down]").forEach(b => b.onclick = () => moveRow(+b.dataset.down, 1));
+    ul.querySelectorAll("[data-chk]").forEach(c => c.onchange = () => { roster[+c.dataset.chk].active = c.checked; renderRoster(); });
+  }
+  function moveRow(i, dir){
+    const j = i + dir; if (j < 0 || j >= roster.length) return;
+    const t = roster[i]; roster[i] = roster[j]; roster[j] = t; renderRoster();
+  }
+  async function saveRoster(){
+    const pw = $("pw").value.trim();
+    if (!pw){ $("pw").classList.add("bad"); $("pw").focus();
+      setAlert("⚠ 先に管理パスワードを入力してください（上の入力欄）", "err"); return; }
+    const items = roster.map((m, i) => ({ id: m.id, active: m.active, order: i + 1 }));
+    setAlert("保存中…", "info");
+    try{
+      const body = JSON.stringify({ action: "saveRoster", adminKey: pw, items: items });
+      const j = await (await fetch(CONFIG.GAS_URL, { method:"POST", body: body })).json();
+      if (j.ok){ setAlert("✅ 参加・並び順を保存しました（地図・送信ページに反映されます）", "ok"); loadRosterAdmin(); }
+      else if (j.error === "admin_auth"){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 管理パスワードが違います", "err"); }
+      else setAlert("エラー：" + (j.error || "不明"), "err");
+    }catch(e){ setAlert("通信エラー：" + e.message, "err"); }
+  }
+  $("saveRoster").onclick = saveRoster;
+  loadRosterAdmin();
+
+  /* ===== 紹介文・画像の編集 ===== */
+  function driveImg(u){
+    u=(u||"").trim(); if(!u) return "";
+    const m=u.match(/\/d\/([-\w]{20,})/)||u.match(/[?&]id=([-\w]{20,})/);
+    return m ? ("https://drive.google.com/thumbnail?id="+m[1]+"&sz=w600") : u;
+  }
+  let introData = [];   // [{id,name,intro,img}]
+  async function loadIntroAdmin(){
+    let map={};
+    try{
+      const url=CONFIG.GAS_URL+(CONFIG.GAS_URL.includes("?")?"&":"?")+"type=intro&_="+Date.now();
+      const j=await (await fetch(url)).json();
+      (j.intro||[]).forEach(r=>{ map[r.id]={intro:r.intro||"",img:r.img||""}; });
+    }catch(e){}
+    introData = CONFIG.MIKOSHI.map(m=>({ id:m.id, name:m.name,
+      intro:(map[m.id]?map[m.id].intro:""), img:(map[m.id]?map[m.id].img:"") }));
+    renderIntro();
+  }
+  function renderIntro(){
+    const box=$("introList"); box.innerHTML="";
+    introData.forEach((m,i)=>{
+      const card=document.createElement("div"); card.className="introItem";
+      card.innerHTML=
+        '<div class="introName">'+m.name+' <span class="introId">'+m.id+'</span></div>'+
+        '<textarea data-intro="'+i+'" rows="2" placeholder="紹介文（例：担ぎ手の掛け声と勇壮な差し上げが見どころ）">'+ (m.intro||"") +'</textarea>'+
+        '<input type="text" data-img="'+i+'" placeholder="画像URL（Googleドライブの共有リンクを貼り付け）" value="'+ (m.img||"").replace(/"/g,'&quot;') +'">'+
+        '<div class="introPrev"><img data-prev="'+i+'" src="'+ (m.img?driveImg(m.img):"") +'" alt="" '+(m.img?"":"style=display:none")+'></div>';
+      box.appendChild(card);
+    });
+    box.querySelectorAll("[data-intro]").forEach(t=>t.oninput=()=>{ introData[+t.dataset.intro].intro=t.value; });
+    box.querySelectorAll("[data-img]").forEach(inp=>inp.oninput=()=>{
+      const i=+inp.dataset.img; introData[i].img=inp.value;
+      const pv=box.querySelector('[data-prev="'+i+'"]'); const u=driveImg(inp.value);
+      if(u){ pv.src=u; pv.style.display=""; } else { pv.style.display="none"; }
+    });
+  }
+  async function saveIntro(){
+    const pw=$("pw").value.trim();
+    if(!pw){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 先に管理パスワードを入力してください（上の入力欄）","err"); return; }
+    const items=introData.map(m=>({ id:m.id, intro:m.intro||"", img:m.img||"" }));
+    setAlert("保存中…","info");
+    try{
+      const body=JSON.stringify({action:"saveIntro",adminKey:pw,items:items});
+      const j=await (await fetch(CONFIG.GAS_URL,{method:"POST",body:body})).json();
+      if(j.ok){ setAlert("✅ 紹介文・画像を保存しました（地図に反映されます）","ok"); }
+      else if(j.error==="admin_auth"){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 管理パスワードが違います","err"); }
+      else setAlert("エラー："+(j.error||"不明"),"err");
+    }catch(e){ setAlert("通信エラー："+e.message,"err"); }
+  }
+  $("saveIntro").onclick=saveIntro;
+  loadIntroAdmin();
+</script>
+</body>
+</html>
