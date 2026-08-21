@@ -142,24 +142,40 @@ body{
   padding:9px 14px;
 }
 
-/* 注意書きⓘ（上部バーの右端・枠なし） */
+/* ===== 注意書き（地図右下のⓘ・半透明） ===== */
 .info-btn{
-  margin-left:auto;
-  width:auto; height:auto; padding:0 4px;
-  background:transparent; border:none; border-radius:0;
-  color:#fff; opacity:.65; cursor:pointer;
-  font-size:20px; line-height:1; flex:none;
+  position:absolute; right:12px; bottom:14px; z-index:1200;
+  width:34px; height:34px; border-radius:50%;
+  background:#fff; color:var(--ai); border:2px solid var(--ai);
+  font-size:17px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  opacity:.5; box-shadow:0 2px 6px rgba(0,0,0,.2);
+  transition:opacity .15s;
 }
-.info-btn:hover{ opacity:1; }
-.info-btn.on{ opacity:1; background:transparent; }
+.info-btn:hover{ opacity:.85; }
+.info-btn.on{ opacity:1; background:var(--ai); color:#fff; }
 .info-bubble{
-  position:absolute; right:12px; top:52px; z-index:1300;
+  position:absolute; right:12px; bottom:56px; z-index:1300;
   max-width:min(320px,80vw); background:#fff; color:#444;
   border:1px solid var(--ai); border-radius:10px;
   padding:12px 14px; font-size:12px; line-height:1.7;
   box-shadow:0 6px 20px rgba(0,0,0,.28); display:none;
 }
 .info-bubble.open{ display:block; }
+
+/* ===== 準備中モードの黄色帯 ===== */
+.premode-bar{
+  display:none; position:absolute; top:0; left:0; right:0; z-index:1150;
+  background:#ffd400; color:#000; font-weight:800; font-size:13.5px; line-height:1.4;
+  text-align:center; padding:9px 12px; box-shadow:0 2px 6px rgba(0,0,0,.25);
+}
+.premode-on .premode-bar{ display:block; }
+/* 帯が出ている間は、上部のボタン類を帯の下へずらして重ならないようにする */
+.premode-on .leaflet-top{ margin-top:46px; }
+.premode-on .panel-toggle{ top:56px; }
+.premode-on .locate-btn{ top:142px; }
+.premode-on .layer-btn{ top:196px; }
+.premode-on .layer-panel{ top:196px; }
 
 /* ポップアップ内の紹介画像（横幅いっぱい・高さ120px） */
 .pop-img{ margin-top:8px; }
