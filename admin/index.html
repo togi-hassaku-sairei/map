@@ -70,6 +70,14 @@
     font-size:11px; line-height:1; cursor:pointer; padding:0; }
   .ord button:disabled{ opacity:.3; }
   .rswatch{ width:16px; height:16px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; flex:none; }
+  .pmstate{ font-size:12px; font-weight:800; color:#555; }
+  .pmstate.on{ color:#b26a00; }
+  .pmstate.offb{ color:#2e7d32; }
+  .pmrow{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .pmrow .save.off{ background:#2e7d32; }
+  .pmrow2{ margin-top:8px; }
+  .linkbtn{ background:#1f3a5f; color:#fff; border:none; border-radius:8px; padding:11px 14px;
+    font-size:13px; font-weight:700; cursor:pointer; width:100%; }
 </style>
 </head>
 <body>
@@ -78,7 +86,25 @@
   <div class="panel">
     <label class="lbl" for="pw">管理パスワード</label>
     <input id="pw" type="password" placeholder="ここに管理パスワードを入力" autocomplete="off">
-    <div class="hint">神輿データを「削除」するときに使います。このパスワードは端末に保存されません（画面を閉じると消えます）。</div>
+    <div class="hint">各種の保存・切替に使います。このパスワードは端末に保存されません（画面を閉じると消えます）。</div>
+  </div>
+
+  <div class="panel" id="premodePanel">
+    <div class="rosterHead">
+      <span class="ttl">準備中モード（祭り前の表示）</span>
+      <span id="premodeState" class="pmstate">状態：取得中…</span>
+    </div>
+    <div class="hint2">
+      <b>ON</b>にすると、一般公開の地図では各キリコ・神輿等を<b>各地区の神社の位置に固定表示</b>し、上部に「準備中です。巡行開始後、実際の位置を表示します。」と表示します（GPS未装着でも見当違いの場所に出ません）。<br>
+      巡行が始まったら<b>OFF</b>にすると、実際の位置表示に切り替わります。※管理者用マップは、ONでも常に実際の位置を表示します。
+    </div>
+    <div class="pmrow">
+      <button id="premodeOn"  class="save">🟡 準備中モードにする（ON）</button>
+      <button id="premodeOff" class="save off">🟢 本番表示にする（OFF）</button>
+    </div>
+    <div class="pmrow2">
+      <button id="openAdminMap" class="linkbtn">🗺️ 管理者用マップを開く（実際の位置・要パスワード）</button>
+    </div>
   </div>
 
   <div class="alert info" id="alert">パスワードを入力し、削除したい神輿の行の「削除」を押してください。</div>
@@ -291,6 +317,40 @@
   }
   $("saveIntro").onclick=saveIntro;
   loadIntroAdmin();
+
+  /* ===== 準備中モード ===== */
+  async function loadPremode(){
+    try{
+      const url=CONFIG.GAS_URL+(CONFIG.GAS_URL.includes("?")?"&":"?")+"type=premode&_="+Date.now();
+      const j=await (await fetch(url)).json();
+      showPremode(!!j.premode);
+    }catch(e){ $("premodeState").textContent="状態：取得できません"; }
+  }
+  function showPremode(on){
+    const el=$("premodeState");
+    el.textContent = on ? "状態：準備中モード ON（神社に固定表示）" : "状態：本番表示 OFF（実際の位置）";
+    el.className = "pmstate " + (on ? "on" : "offb");
+  }
+  async function setPremode(on){
+    const pw=$("pw").value.trim();
+    if(!pw){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 先に管理パスワードを入力してください","err"); return; }
+    setAlert("切替中…","info");
+    try{
+      const body=JSON.stringify({action:"setPremode",adminKey:pw,on:on});
+      const j=await (await fetch(CONFIG.GAS_URL,{method:"POST",body:body})).json();
+      if(j.ok){ showPremode(!!j.premode); setAlert(on?"✅ 準備中モードにしました（一般公開は神社に固定表示）":"✅ 本番表示にしました（実際の位置）","ok"); }
+      else if(j.error==="admin_auth"){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 管理パスワードが違います","err"); }
+      else setAlert("エラー："+(j.error||"不明"),"err");
+    }catch(e){ setAlert("通信エラー："+e.message,"err"); }
+  }
+  $("premodeOn").onclick=()=>setPremode(true);
+  $("premodeOff").onclick=()=>setPremode(false);
+  $("openAdminMap").onclick=()=>{
+    const pw=$("pw").value.trim();
+    if(!pw){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 先に管理パスワードを入力してください","err"); return; }
+    window.open("../?admin="+encodeURIComponent(pw), "_blank");
+  };
+  loadPremode();
 </script>
 </body>
 </html>
