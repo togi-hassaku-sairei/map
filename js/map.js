@@ -76,7 +76,7 @@ function dir8(deg){
   const d = dirs[Math.round(deg/45) % 8];
   return { arrow:d[0], text:d[1] };
 }
-const MOVE_THRESHOLD_M = 5;   // 5m以上で「移動中」
+const MOVE_THRESHOLD_M = 10;   // 10m以上で「移動中」
 
 /* 神輿アイコンを作る（紋バッジ画像。通信断は灰色化） */
 function makeIcon(m, offline){
