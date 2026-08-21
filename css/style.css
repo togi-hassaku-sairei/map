@@ -147,9 +147,12 @@ body{
   flex-shrink:0; z-index:1200;
   width:34px; height:34px; border-radius:50%;
   background:transparent; color:#fff; border:none;
-  ...
+  font-size:17px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
   opacity:.75; box-shadow:none;
-  ...
+  transition:opacity .15s;
+}
+.info-btn:hover{ opacity:1; }
 .info-btn.on{ opacity:1; }
 .info-bubble{
   position:fixed; right:12px; top:60px; z-index:1300;
