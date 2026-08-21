@@ -19,7 +19,7 @@ const API_KEY_HEADER = "Authorization";
 const API_KEY_PREFIX = "Bearer ";
 
 /* ===== ② 管理者パスワード（公開ファイルには書かない）===== */
-const ADMIN_KEY = "kanri-himitsu-CHANGE_ME";
+const ADMIN_KEY = "Bebesheto";
 
 /* ===== ③ 緊急スマホ送信の設定 ===== */
 const SEND_KEY = "Bebesheto";       // 緊急送信ページの書き込みキー（config側と一致）
@@ -34,6 +34,22 @@ const MASTER_SHEET= "Master";
 const ERR_SHEET   = "ErrorLog";
 const CACHE_KEY = "cur"; const CACHE_SEC = 15;
 const MKEY = "roster"; const MCACHE_SEC = 60;
+
+/* 各地区の神社の座標（準備中モードでの固定表示位置）[緯度, 経度] */
+const SHRINE = {
+  "m01":[37.15252524716476,136.73781705659331],  // 森之内（本社）
+  "m02":[37.1387388,136.7273389],                 // 富来領家町
+  "m03":[37.15245953174496,136.72105699262983],   // 里本江
+  "m04":[37.13816091320865,136.73231934300543],   // 富来地頭町
+  "m05":[37.142855458942485,136.73363213583974],  // 富来高田
+  "m06":[37.14497701499218,136.74643380908475],   // 東小室
+  "m07":[37.15558531947957,136.72794387840065],   // 給分
+  "m09":[37.127964074651736,136.72919797938192],  // 七海
+  "m11":[37.153889884363345,136.75022276816543],  // 貝田
+  "m12":[37.15553970594976,136.7599235074051],    // 大西
+  "m13":[37.15576071656226,136.71204908756638],   // 相神
+  "g01":[37.15079642786244,136.73798345672486]    // ガチャガチャ
+};
 
 function ss_(){ return SpreadsheetApp.getActiveSpreadsheet(); }
 
@@ -50,7 +66,7 @@ function getHistory_(){
 }
 function getMaster_(){
   const ss=ss_(); let sh=ss.getSheetByName(MASTER_SHEET);
-  if(!sh){ sh=ss.insertSheet(MASTER_SHEET); sh.appendRow(["神輿ID","神輿名","担当地区","参加","表示順","APIのID"]); }
+  if(!sh){ sh=ss.insertSheet(MASTER_SHEET); sh.appendRow(["神輿ID","神輿名","担当地区","参加","表示順","APIのID","紹介文","画像URL"]); }
   return sh;
 }
 function getErrorLog_(){
@@ -63,7 +79,7 @@ function getErrorLog_(){
 function setupSheets(){
   getCurrent_(); getHistory_(); getErrorLog_();
   const sh=getMaster_();
-  sh.getRange(1,1,1,6).setValues([["神輿ID","神輿名","担当地区","参加","表示順","APIのID"]]);
+  sh.getRange(1,1,1,8).setValues([["神輿ID","神輿名","担当地区","参加","表示順","APIのID","紹介文","画像URL"]]);
   if(sh.getLastRow()<2){
     // 神輿ID / 名前 / 地区 / 参加 / 表示順 / APIのID（←空。listDevices実行後に実端末IDを記入）
     const base=[
@@ -112,8 +128,9 @@ function pullFromApi(){
                || (json.id!==undefined ? [json] : []));
     if(!Array.isArray(arr) || !arr.length){ logError_("APIデータが空、または配列ではありません"); return; }
 
-    // 3) Master の「APIのID → 神輿ID/名」対応表
+    // 3) Master の対応表（APIのID→神輿ID/名）と 紹介文/画像URL（神輿IDごと・固定）
     const map=getApiMap_();
+    const introMap=getIntroMap_();
 
     const cur=getCurrent_(); const hist=getHistory_();
     const now=new Date();
@@ -151,8 +168,9 @@ function pullFromApi(){
         return;   // 手動送信優先（時間切れになればAPIが再び上書き）
       }
 
-      const desc = (r.description ? String(r.description).replace(/\s+/g," ").trim() : "");
-      const link = (r.url ? String(r.url) : "");
+      // 紹介文・画像はMaster固定（APIの説明・URLは使わない）
+      const desc = introMap[mid] ? introMap[mid].intro : "";
+      const link = introMap[mid] ? introMap[mid].img   : "";
       const tEpoch=parseTime_(tRaw);
       const tStr = tEpoch ? Utilities.formatDate(new Date(tEpoch),TZ,"yyyy/MM/dd HH:mm:ss") : nowStr;
 
@@ -195,6 +213,36 @@ function getMasterNameMap_(){
   return map;
 }
 
+/* 神輿ID → {intro（紹介文）, img（表示用画像URL）} をMasterから作る */
+function getIntroMap_(){
+  const sh=getMaster_(); const last=sh.getLastRow(); const map={};
+  if(last>=2){
+    sh.getRange(2,1,last-1,8).getValues().forEach(function(r){
+      if(r[0]) map[String(r[0])]={ intro:String(r[6]||""), img:driveImg_(String(r[7]||"")) };
+    });
+  }
+  return map;
+}
+
+/* Googleドライブの共有リンク等 → 画像として表示できるURLに変換 */
+function driveImg_(u){
+  u=String(u||"").trim(); if(!u) return "";
+  var m = u.match(/\/d\/([-\w]{20,})/) || u.match(/[?&]id=([-\w]{20,})/);
+  if(m) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w600";
+  return u;   // 通常の画像URLはそのまま
+}
+
+/* 管理画面用：Masterの紹介文・画像URL（生の値）を返す */
+function introRaw_(){
+  const sh=getMaster_(); const last=sh.getLastRow(); const list=[];
+  if(last>=2){
+    sh.getRange(2,1,last-1,8).getValues().forEach(function(r){
+      if(r[0]) list.push({ id:String(r[0]), name:r[1], intro:String(r[6]||""), img:String(r[7]||"") });
+    });
+  }
+  return {ok:true, intro:list};
+}
+
 /* 時刻文字列 → epoch（タイムゾーン無しはJSTとして扱う。/ 区切りにも対応）*/
 function parseTime_(s){
   if(!s) return null;
@@ -218,24 +266,61 @@ function doGet(e){
   if(p.type==="years")   return getYears_();
   if(p.type==="history") return getHistoryJson_(p.year,p.id);
   if(p.type==="track")   return getTrackJson_();
+  if(p.type==="intro")   return out_(introRaw_());
+  if(p.type==="premode") return out_({ ok:true, premode:getPremode_() });
 
-  // 既定：最新位置
+  const isAdmin = (p.admin && p.admin===ADMIN_KEY);   // 管理者用マップは実位置
+  const premode = getPremode_();
   const cache=CacheService.getScriptCache();
-  const cached=cache.get(CACHE_KEY);
-  if(cached) return out_raw_(cached);
 
+  // 準備中モード（一般公開のみ）：各地区の神社に固定表示
+  if(premode && !isAdmin){
+    const c=cache.get(CACHE_KEY);
+    if(c) return out_raw_(c);
+    const body=JSON.stringify(buildPremodeList_());
+    cache.put(CACHE_KEY, body, CACHE_SEC);
+    return out_raw_(body);
+  }
+
+  // 通常（実位置）。管理者はキャッシュを使わず常に最新
+  if(!isAdmin){
+    const cached=cache.get(CACHE_KEY);
+    if(cached) return out_raw_(cached);
+  }
   const sh=getCurrent_(); const last=sh.getLastRow(); const list=[];
   if(last>=2){
     sh.getRange(2,1,last-1,9).getValues().forEach(function(r){
-      list.push({ id:String(r[0]), name:r[1], lat:Number(r[2]), lng:Number(r[3]),
+      list.push({ id:String(r[0]), name:r[1], lat:num_(r[2]), lng:num_(r[3]),
         speed:null, updated: parseTime_(r[4]) || 0,
-        desc:(r[5]||""), link:(r[6]||""), src:(r[7]||"api") });
+        desc:(r[5]||""), img:(r[6]||""), src:(r[7]||"api") });
     });
   }
-  const body=JSON.stringify({ ok:true, server:Date.now(), mikoshi:list });
-  cache.put(CACHE_KEY, body, CACHE_SEC);
+  const body=JSON.stringify({ ok:true, server:Date.now(), premode:false, mikoshi:list });
+  if(!isAdmin) cache.put(CACHE_KEY, body, CACHE_SEC);
   return out_raw_(body);
 }
+
+/* 準備中モードの表示（参加中の各地区を神社座標に固定） */
+function buildPremodeList_(){
+  const introMap=getIntroMap_();
+  const sh=getMaster_(); const last=sh.getLastRow(); const list=[]; const now=Date.now();
+  if(last>=2){
+    sh.getRange(2,1,last-1,8).getValues().forEach(function(r){
+      const id=String(r[0]); if(!id) return;
+      const active=(r[3]===""||r[3]===null)?true:(r[3]===true||String(r[3]).toUpperCase()==="TRUE"||String(r[3])==="1"||r[3]==="○");
+      if(!active) return;
+      const sc=SHRINE[id]; if(!sc) return;   // 神社座標が無い地区は表示しない
+      list.push({ id:id, name:r[1], lat:sc[0], lng:sc[1], speed:null, updated:now,
+        desc:(introMap[id]?introMap[id].intro:""), img:(introMap[id]?introMap[id].img:""), src:"premode" });
+    });
+  }
+  return { ok:true, server:now, premode:true, mikoshi:list };
+}
+
+/* 準備中モードのON/OFF（スクリプトのプロパティに保存） */
+function getPremode_(){ return PropertiesService.getScriptProperties().getProperty("PREMODE")==="1"; }
+function setPremode_(on){ PropertiesService.getScriptProperties().setProperty("PREMODE", on?"1":"0"); }
+
 
 /* 参加・表示順（Master由来）*/
 function rosterBody_(){
@@ -303,6 +388,13 @@ function doPost(e){
     lock.waitLock(15000);
     const data=JSON.parse(e.postData.contents);
 
+    if(data.action==="setPremode"){
+      if(data.adminKey!==ADMIN_KEY) return out_({ok:false,error:"admin_auth"});
+      setPremode_(!!data.on);
+      CacheService.getScriptCache().remove(CACHE_KEY);
+      return out_({ok:true, premode:!!data.on});
+    }
+
     if(data.action==="delete"){
       if(data.adminKey!==ADMIN_KEY) return out_({ok:false,error:"admin_auth"});
       const sh=getCurrent_(); const last=sh.getLastRow();
@@ -328,7 +420,25 @@ function doPost(e){
       return out_({ok:true});
     }
 
-    /* ★緊急スマホ送信（位置の受信）*/
+    /* 管理者：紹介文・画像URLの保存（Master固定情報を更新＋即時に地図へ反映） */
+    if(data.action==="saveIntro"){
+      if(data.adminKey!==ADMIN_KEY) return out_({ok:false,error:"admin_auth"});
+      const sh=getMaster_(); const last=sh.getLastRow();
+      if(last<2) return out_({ok:false,error:"no_master"});
+      const ids=sh.getRange(2,1,last-1,1).getValues().flat().map(String);
+      const cur=getCurrent_(); const cl=cur.getLastRow();
+      let curIds=[]; if(cl>=2) curIds=cur.getRange(2,1,cl-1,1).getValues().flat().map(String);
+      (data.items||[]).forEach(function(it){
+        const idx=ids.indexOf(String(it.id));
+        if(idx<0) return;
+        sh.getRange(idx+2,7,1,2).setValues([[ String(it.intro||""), String(it.img||"") ]]);   // Master 紹介文/画像URL
+        const ci=curIds.indexOf(String(it.id));
+        if(ci>=0) cur.getRange(ci+2,6,1,2).setValues([[ String(it.intro||""), driveImg_(String(it.img||"")) ]]);  // 即時反映
+      });
+      CacheService.getScriptCache().remove(MKEY);
+      CacheService.getScriptCache().remove(CACHE_KEY);
+      return out_({ok:true});
+    }
     if(data.action==="send" || (data.key!==undefined && data.lat!==undefined)){
       if(data.key!==SEND_KEY) return out_({ok:false,error:"auth"});
       const mid=String(data.id);
@@ -372,6 +482,17 @@ function doPost(e){
 
 function out_(obj){ return out_raw_(JSON.stringify(obj)); }
 function out_raw_(str){ return ContentService.createTextOutput(str).setMimeType(ContentService.MimeType.JSON); }
+
+/* 数値を安全に変換（全角・カンマ・空白・不可視文字を除去して桁落ちを防ぐ）*/
+function num_(v){
+  if (typeof v === "number") return v;
+  var s = String(v).trim()
+    .replace(/[，,]/g, "")
+    .replace(/[０-９．－]/g, function(c){ return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+    .replace(/[^\d.\-]/g, "");
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
 
 /* ============================================================
  *  動作確認用：APIの生データを一度だけ手動取得してログ表示
