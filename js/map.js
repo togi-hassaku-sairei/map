@@ -55,6 +55,8 @@ const state   = {};                  // id -> 最新データ
 const movement = {};                 // id -> {lat,lng,updated,moving,arrow,dirText}
 let lastServerTime = 0;
 let ROSTER = CONFIG.MIKOSHI.slice();
+let PREMODE = false;                  // 準備中モード（神社固定表示）
+const ADMIN_PARAM = new URLSearchParams(location.search).get("admin");  // 管理者用マップは実位置
 
 /* ---- 距離(Haversine)・方位 ---- */
 function haversine(a, b){
@@ -74,7 +76,7 @@ function dir8(deg){
   const d = dirs[Math.round(deg/45) % 8];
   return { arrow:d[0], text:d[1] };
 }
-const MOVE_THRESHOLD_M = 20;   // 20m以上で「移動中」
+const MOVE_THRESHOLD_M = 5;   // 5m以上で「移動中」
 
 /* 神輿アイコンを作る（紋バッジ画像。通信断は灰色化） */
 function makeIcon(m, offline){
@@ -126,6 +128,14 @@ function popupHtml(m, c){
   if (!c.known) return '<div class="pop"><b>' + m.name + "</b><div class='line'>まだ位置を受信していません</div></div>";
   const d = c.d;
   let html = '<div class="pop"><b>' + m.name + "</b>";
+  if (PREMODE){
+    html += '<div class="line" style="color:#7a5b00;font-weight:800;">🟡 準備中です。巡行開始後、実際の位置を表示します。</div>';
+    if (d.desc) html += '<div class="line" style="color:#5a4;">💬 ' + d.desc + "</div>";
+    if (d.img)  html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
+    html += '<div class="line">神社の位置：' + d.lat.toFixed(5) + ", " + d.lng.toFixed(5) + "</div>";
+    html += dirBtn(d.lat, d.lng) + "</div>";
+    return html;
+  }
   if (d.desc) html += '<div class="line" style="color:#5a4;">💬 ' + d.desc + "</div>";
   html += '<div class="line">最終更新：' + clock(d.updated) + "（" + ago(c.sec) + "）</div>";
   const mi = (!c.offline) ? moveInfo(m.id) : null;
@@ -198,9 +208,9 @@ function updateList(){
     const hit = (m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
     if (q && !hit) return;
 
-    // 移動中／停止中・進行方向（通信中のみ）
+    // 移動中／停止中・進行方向（通信中のみ／準備中モードでは出さない）
     let moveLine = "";
-    if (c.known && !c.offline){
+    if (!PREMODE && c.known && !c.offline){
       const mi = moveInfo(m.id);
       if (mi){
         moveLine = mi.moving
@@ -209,6 +219,8 @@ function updateList(){
       }
     }
 
+    const subText = PREMODE ? "準備中（各地区の神社）"
+                            : (c.known ? "更新 " + ago(c.sec) : "位置情報なし");
     const li = document.createElement("li");
     li.className = "row";
     li.innerHTML =
@@ -218,7 +230,7 @@ function updateList(){
       '<div class="row-main">' +
         '<div class="row-name"><span class="row-dot" style="background:' + m.color + '"></span>' + m.name + "</div>" +
         moveLine +
-        '<div class="row-sub">' + (c.known ? "更新 " + ago(c.sec) : "位置情報なし") + "</div>" +
+        '<div class="row-sub">' + subText + "</div>" +
       "</div>";
     li.onclick = () => focusMikoshi(m.id);
     ul.appendChild(li);
@@ -245,12 +257,18 @@ function focusMikoshi(id){
 /* ---- サーバーから取得 ---- */
 async function fetchData(){
   try{
-    const url = CONFIG.GAS_URL + (CONFIG.GAS_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+    let url = CONFIG.GAS_URL + (CONFIG.GAS_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+    if (ADMIN_PARAM) url += "&admin=" + encodeURIComponent(ADMIN_PARAM);   // 管理者用マップは実位置
     const res = await fetch(url, { method:"GET" });
     const json = await res.json();
     if (!json.ok) throw new Error("server");
 
     lastServerTime = json.server || Date.now();
+
+    // 準備中モードの反映（帯の表示・上部ボタンの位置調整）
+    PREMODE = !!json.premode;
+    const layout = document.querySelector(".layout");
+    if (layout) layout.classList.toggle("premode-on", PREMODE);
 
     const rippleTargets = [];
     json.mikoshi.forEach(d => {
@@ -271,8 +289,8 @@ async function fetchData(){
       }
       // updatedが同じ（変化なし）→ movementはそのまま維持
 
-      // 停止→移動に変わった瞬間だけ波紋
-      if (!wasMoving && movement[d.id] && movement[d.id].moving){
+      // 停止→移動に変わった瞬間だけ波紋（準備中モードでは出さない）
+      if (!PREMODE && !wasMoving && movement[d.id] && movement[d.id].moving){
         rippleTargets.push(d.id);
       }
 
