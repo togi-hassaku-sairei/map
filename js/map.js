@@ -130,13 +130,13 @@ function popupHtml(m, c){
   let html = '<div class="pop"><b>' + m.name + "</b>";
   if (PREMODE){
     html += '<div class="line" style="color:#7a5b00;font-weight:800;">🟡 準備中です。巡行開始後、実際の位置を表示します。</div>';
-    if (d.desc) html += '<div class="line" style="color:#5a4;">💬 ' + d.desc + "</div>";
+    html += descBlock(m, d);
     if (d.img)  html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
     html += '<div class="line">神社の位置：' + d.lat.toFixed(5) + ", " + d.lng.toFixed(5) + "</div>";
     html += dirBtn(d.lat, d.lng) + "</div>";
     return html;
   }
-  if (d.desc) html += '<div class="line" style="color:#5a4;">💬 ' + d.desc + "</div>";
+  html += descBlock(m, d);
   html += '<div class="line">最終更新：' + clock(d.updated) + "（" + ago(c.sec) + "）</div>";
   const mi = (!c.offline) ? moveInfo(m.id) : null;
   if (mi){
@@ -418,3 +418,72 @@ async function refreshRoster(){
 }
 refreshRoster();
 setInterval(refreshRoster, 300000);
+
+/* ===== 詳細シート（長い紹介文は地図から切り離して読ませる） ===== */
+function escH(s){
+  return String(s).replace(/[&<>"]/g, function(c){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
+  });
+}
+
+/* ポップアップ用：紹介文は冒頭だけ＋「詳しく見る」 */
+function descBlock(m, d){
+  if (!d.desc && !d.img) return "";
+  let h = "";
+  if (d.desc){
+    const flat  = String(d.desc).replace(/\s+/g, " ").trim();
+    const short = flat.length > 54 ? flat.slice(0, 54) + "…" : flat;
+    h += '<div class="line" style="color:#5a4;">💬 ' + escH(short) + "</div>";
+  }
+  h += '<button type="button" class="detail-btn" data-detail="' + escH(m.id) + '">▼ 詳しく見る</button>';
+  return h;
+}
+
+function openDetail(id){
+  const m = (typeof ROSTER !== "undefined" && ROSTER.find(x => x.id === id))
+            || CONFIG.MIKOSHI.find(x => x.id === id);
+  const d = state[id];
+  if (!m || !d) return;
+
+  document.getElementById("sheetTitle").textContent = m.name || "";
+  const body = document.getElementById("sheetBody");
+  body.innerHTML = "";
+
+  if (d.img){
+    const fig = document.createElement("div"); fig.className = "sheet-img";
+    const im  = document.createElement("img");
+    im.src = d.img; im.alt = ""; im.loading = "lazy";
+    fig.appendChild(im); body.appendChild(fig);
+  }
+  if (d.desc){
+    const p = document.createElement("p");
+    p.className = "sheet-text";
+    p.textContent = d.desc;          // 改行はCSSのpre-wrapで保持
+    body.appendChild(p);
+  }
+  const a = document.createElement("a");
+  a.className = "sheet-dir";
+  a.href = "https://www.google.com/maps/dir/?api=1&destination=" + d.lat + "," + d.lng;
+  a.target = "_blank"; a.rel = "noopener";
+  a.textContent = "🧭 経路（Googleマップ）";
+  body.appendChild(a);
+
+  document.getElementById("detailSheet").classList.add("open");
+  document.getElementById("sheetMask").classList.add("open");
+}
+
+function closeDetail(){
+  document.getElementById("detailSheet").classList.remove("open");
+  document.getElementById("sheetMask").classList.remove("open");
+}
+
+document.addEventListener("click", function(ev){
+  const t = ev.target;
+  if (!t || !t.closest) return;
+  const b = t.closest("[data-detail]");
+  if (b){ ev.preventDefault(); openDetail(b.getAttribute("data-detail")); return; }
+  if (t.closest("#sheetClose") || t.id === "sheetMask") closeDetail();
+});
+document.addEventListener("keydown", function(ev){
+  if (ev.key === "Escape") closeDetail();
+});
