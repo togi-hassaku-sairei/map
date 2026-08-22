@@ -219,7 +219,7 @@ function updateList(){
       }
     }
 
-    const subText = PREMODE ? "準備中（各地区の神社）"
+    const subText = PREMODE ? "準備中"
                             : (c.known ? "更新 " + ago(c.sec) : "位置情報なし");
     const li = document.createElement("li");
     li.className = "row";
