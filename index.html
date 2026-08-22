@@ -37,7 +37,13 @@
       <button class="layer-opt sel" data-base="std" role="menuitemradio"><span class="chk">✓</span>標準地図</button>
       <button class="layer-opt" data-base="photo" role="menuitemradio"><span class="chk"></span>航空写真</button>
     </div>
-
+    <div class="sheet-mask" id="sheetMask"></div>
+    <aside class="detail-sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <div class="sheet-grip"></div>
+      <button class="sheet-close" id="sheetClose" aria-label="閉じる">✕</button>
+      <h2 class="sheet-title" id="sheetTitle"></h2>
+      <div class="sheet-body" id="sheetBody"></div>
+    </aside>
   </div>
 
   <div class="banner" id="banner"></div>
