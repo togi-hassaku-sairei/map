@@ -78,6 +78,9 @@ function dir8(deg){
 }
 const MOVE_THRESHOLD_M = 10;   // 10m以上で「移動中」
 
+/* 電池残量の表記（1:電池なし 2:電池少ない 3:電池あり 128:取得不可） */
+const BAT_LABEL = { 1:"電池なし", 2:"電池少ない", 3:"電池あり" };
+
 /* 神輿アイコンを作る（紋バッジ画像。通信断は灰色化） */
 function makeIcon(m, offline){
   const src = m.icon || "";
