@@ -264,11 +264,15 @@ body{
 /* ===== ボタン共通（ポップアップ・詳細シート） ===== */
 .pop-dir{ text-align:center; margin-top:10px; }
 
-.btn-primary{
+.btn-primary,
+.leaflet-popup-content .btn-primary{
   display:inline-block; padding:10px 18px;
-  background:#1B2F52; color:#fff; border:none; border-radius:8px;
+  background:#1B2F52; color:#fff !important; border:none; border-radius:8px;
   font-weight:700; font-size:13px; text-decoration:none; cursor:pointer;
 }
+.btn-primary:hover,
+.btn-primary:visited,
+.leaflet-popup-content .btn-primary:hover{ color:#fff !important; }
 .btn-primary:hover{ background:#2a4675; }
 
 .detail-btn{
