@@ -117,10 +117,9 @@ function moveInfo(id){
 
 /* Googleマップ経路ボタン */
 function dirBtn(lat, lng){
-  return '<a href="https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '" ' +
-    'target="_blank" rel="noopener" ' +
-    'style="display:inline-block;margin-top:9px;padding:9px 14px;background:#1a73e8;color:#fff;' +
-    'border-radius:8px;font-weight:700;text-decoration:none;font-size:13px;">🧭 経路（Googleマップ）</a>';
+  return '<div class="pop-dir"><a class="btn-primary" ' +
+    'href="https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '" ' +
+    'target="_blank" rel="noopener">経路（Googleマップ）</a></div>';
 }
 
 /* ポップアップの中身 */
@@ -132,7 +131,6 @@ function popupHtml(m, c){
     html += '<div class="line" style="color:#7a5b00;font-weight:800;">🟡 準備中です。巡行開始後、実際の位置を表示します。</div>';
     html += descBlock(m, d);
     if (d.img)  html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
-    html += '<div class="line">神社の位置：' + d.lat.toFixed(5) + ", " + d.lng.toFixed(5) + "</div>";
     html += dirBtn(d.lat, d.lng) + "</div>";
     return html;
   }
@@ -143,7 +141,8 @@ function popupHtml(m, c){
     html += '<div class="line">状態：' + (mi.moving ? "👣 移動中" : "⏸ 停止中") + "</div>";
     if (mi.moving && mi.dirText) html += '<div class="line">進行方向：' + mi.arrow + " " + mi.dirText + "</div>";
   }
-  html += '<div class="line">現在地：' + d.lat.toFixed(5) + ", " + d.lng.toFixed(5) + "</div>";
+  const batText = BAT_LABEL[Number(d.bat)];
+  if (batText) html += '<div class="line">' + batText + "</div>";
   if (d.img) html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
   html += dirBtn(d.lat, d.lng) + "</div>";
   return html;
@@ -465,7 +464,7 @@ function openDetail(id){
   a.className = "sheet-dir";
   a.href = "https://www.google.com/maps/dir/?api=1&destination=" + d.lat + "," + d.lng;
   a.target = "_blank"; a.rel = "noopener";
-  a.textContent = "🧭 経路（Googleマップ）";
+  a.textContent = "経路（Googleマップ）";
   body.appendChild(a);
 
   document.getElementById("detailSheet").classList.add("open");
