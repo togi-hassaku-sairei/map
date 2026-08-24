@@ -131,7 +131,6 @@ function popupHtml(m, c){
   const d = c.d;
   let html = '<div class="pop"><b>' + m.name + "</b>";
   if (PREMODE){
-    html += '<div class="line" style="color:#7a5b00;font-weight:800;">準備中です。巡行開始後、実際の位置を表示します。</div>';
     html += descBlock(m, d);
     if (d.img)  html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
     html += dirBtn(d.lat, d.lng) + "</div>";
@@ -435,7 +434,7 @@ function descBlock(m, d){
   if (d.desc){
     const flat  = String(d.desc).replace(/\s+/g, " ").trim();
     const short = flat.length > 54 ? flat.slice(0, 54) + "…" : flat;
-    h += '<div class="line" style="color:#5a4;">' + escH(short) + "</div>";
+    h += '<div class="line">' + escH(short) + "</div>";
   }
   h += '<button type="button" class="detail-btn" data-detail="' + escH(m.id) + '">▼ 詳しく見る</button>';
   return h;
