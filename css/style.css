@@ -135,6 +135,22 @@ body{
 .layer-opt.sel{ background:#f3f6fb; color:var(--ai); }
 .layer-opt:active{ background:#e9eef6; }
 
+/* ===== ふきだしを開いている間は、地図の操作アイコンを隠す =====
+   （縮尺＋/−・現在地・地図切替・検索がふきだしと重なって読みにくい、という声への対応）
+   スマホだけ。PCは画面が広く重ならないので、そのまま出しておく */
+@media (max-width:720px){
+  .leaflet-control-zoom, .locate-btn, .layer-btn, .panel-toggle{
+    transition:opacity .18s ease, visibility .18s ease;
+  }
+  .layout.map-focus .leaflet-control-zoom,
+  .layout.map-focus .locate-btn,
+  .layout.map-focus .layer-btn,
+  .layout.map-focus .layer-panel,
+  .layout.map-focus .panel-toggle{
+    opacity:0; visibility:hidden; pointer-events:none;
+  }
+}
+
 /* ===== 注意書き（パネル内の常設テキスト） ===== */
 .panel-note{
   font-size:11px; line-height:1.6; color:#8a8375;
@@ -177,14 +193,17 @@ body{
 .premode-on .layer-btn{ top:196px; }
 .premode-on .layer-panel{ top:196px; }
 
-/* ポップアップ内の紹介画像（縦横どちらの写真も全体が見えるように） */
-.pop-img{ margin-top:8px; text-align:center; }
+/* ポップアップ内の紹介画像（縦横どちらの写真も全体が見えるように・最大2枚） */
+.pop-img{ margin-top:8px; display:flex; gap:6px; justify-content:center; align-items:flex-start; }
+.pop-img figure{ margin:0; flex:1 1 0; min-width:0; text-align:center; }
 .pop-img img{
   max-width:100%; max-height:240px;
   width:auto; height:auto;
   object-fit:contain; border-radius:8px;
   display:inline-block; vertical-align:top; background:#f0efe9;
 }
+.pop-img.two figure{ height:150px; display:flex; align-items:center; justify-content:center; }
+.pop-img.two img{ max-height:100%; max-width:100%; }
 
 /* 中心の青いドット（白フチ・影）。家紋も色も無い＝神輿と混同しない */
 .me-dot{
@@ -250,11 +269,14 @@ body{
 }
 .sheet-title{ margin:0 34px 10px 0; font-size:17px; font-weight:800; flex-shrink:0; }
 .sheet-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
-.sheet-img{ text-align:center; margin-bottom:12px; }
+.sheet-img{ margin-bottom:12px; display:flex; gap:10px; justify-content:center; align-items:flex-start; }
+.sheet-img figure{ margin:0; flex:1 1 0; min-width:0; text-align:center; }
 .sheet-img img{
   max-width:100%; max-height:320px; width:auto; height:auto;
-  border-radius:10px; background:#f0efe9; display:inline-block;
+  object-fit:contain; border-radius:10px; background:#f0efe9; display:inline-block;
 }
+.sheet-img.two figure{ height:240px; display:flex; align-items:center; justify-content:center; }
+.sheet-img.two img{ max-height:100%; max-width:100%; }
 .sheet-text{ margin:0 0 14px; font-size:14px; line-height:1.9; color:#3a3a3a; white-space:pre-wrap; }
 .sheet-dir{
   display:inline-block; padding:10px 16px; background:#1a73e8; color:#fff;
