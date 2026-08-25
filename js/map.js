@@ -3,7 +3,17 @@
  * ============================================================ */
 
 /* ---- 地図の初期化 ---- */
-const map = L.map("map", { zoomControl: true }).setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+/* closePopupOnClick を切ってあるのは、iPhoneで指を離した少しあとに
+   タップがもう一度届き、開いたばかりのふきだしが即座に閉じてしまうため。
+   代わりに下の map.on("click") で、少し間を置いてから閉じる。 */
+const map = L.map("map", { zoomControl: true, closePopupOnClick: false })
+              .setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+
+let popupGuardUntil = 0;   // この時刻まではタップでふきだしを閉じない
+map.on("click", function(){
+  if (Date.now() < popupGuardUntil) return;
+  map.closePopup();
+});
 
 /* ベースマップ（標準地図＝OpenStreetMap／航空写真＝国土地理院シームレス空中写真） */
 const baseLayers = {
@@ -148,7 +158,8 @@ function popupHtml(m, c){
     return html;
   }
   html += descBlock(m, d);
-  html += '<div class="line">最終更新：' + clock(d.updated) + "（" + ago(c.sec) + "）</div>";
+  html += '<div class="line">最終更新：' + clock(d.updated) +
+          '（<span class="pop-ago">' + ago(c.sec) + "</span>）</div>";
   const mi = (!c.offline) ? moveInfo(m.id) : null;
   if (mi){
     html += '<div class="line">状態：' + (mi.moving ? "👣 移動中" : "⏸ 停止中") + "</div>";
@@ -159,6 +170,18 @@ function popupHtml(m, c){
   html += imgsHtml(d, "pop-img");
   html += dirBtn(d.lat, d.lng) + "</div>";
   return html;
+}
+
+/* ふきだしの中身が実際に変わったかを判定する印。
+   経過時間（○秒前）は含めない ― これを含めると5秒ごとに作り直しになり、
+   Leaflet は中身を innerHTML で入れ替えるため写真が読み込み直されてちらつく。 */
+function popupSig(m, c){
+  if (!c.known) return "none";
+  const d = c.d;
+  const mi = (!c.offline) ? moveInfo(m.id) : null;
+  return [PREMODE, c.offline, d.updated, d.lat, d.lng,
+          d.desc, d.img, d.img2, d.bat,
+          mi ? (mi.moving + "/" + mi.arrow + "/" + mi.dirText) : ""].join("|");
 }
 
 /* 波紋アニメーション（新データ受信時。リング色を流用） */
@@ -197,13 +220,24 @@ function updateMarkers(){
       markers[m.id] = L.marker(pos, { icon: makeIcon(m, c.offline) }).addTo(map);
       markers[m.id].bindPopup(popupHtml(m, c), { autoPan: false, maxWidth: 320, maxHeight: 520 });
       markers[m.id]._offState = c.offline;
+      markers[m.id]._sig = popupSig(m, c);
     } else {
       markers[m.id].setLatLng(pos);
       if (markers[m.id]._offState !== c.offline){   // 通信断状態が変わったときだけアイコン再生成
         markers[m.id].setIcon(makeIcon(m, c.offline));
         markers[m.id]._offState = c.offline;
       }
-      markers[m.id].setPopupContent(popupHtml(m, c));
+      // 中身が変わったときだけ作り直す。変わっていなければ経過時間の文字だけ差し替える
+      const sig = popupSig(m, c);
+      if (markers[m.id]._sig !== sig){
+        markers[m.id].setPopupContent(popupHtml(m, c));
+        markers[m.id]._sig = sig;
+      } else if (c.known){
+        const pop = markers[m.id].getPopup();
+        const el  = pop && pop.getElement();
+        const tag = el && el.querySelector(".pop-ago");
+        if (tag) tag.textContent = ago(c.sec);
+      }
     }
   });
 }
@@ -257,7 +291,8 @@ function focusMikoshi(id){
     mk.setZIndexOffset(1000);
     map.setView(mk.getLatLng(), Math.max(map.getZoom(), 16));
     mk.openPopup();
-    setTimeout(() => mk.openPopup(), 350);
+    // 万一閉じられていたときだけ開き直す（無条件だと開閉が二度見えてしまう）
+    setTimeout(() => { if (!mk.isPopupOpen()) mk.openPopup(); }, 400);
   }
   if (window.matchMedia("(max-width:720px)").matches){
     document.getElementById("panel").classList.remove("open");
@@ -431,6 +466,7 @@ function mapFocus(on){
   }
 }
 map.on("popupopen", function(e){
+  popupGuardUntil = Date.now() + 700;   // iPhoneの遅れて届くタップで即閉じるのを防ぐ
   mapFocus(true);
   /* ふきだしが上部バーで切れないよう、開いた瞬間だけ中央に収める
      （autoPan は5秒ごとの更新でも地図が動いてしまうので使わない） */
