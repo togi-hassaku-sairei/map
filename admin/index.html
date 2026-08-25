@@ -54,7 +54,8 @@
   .introItem textarea, .introItem input[type=text]{
     width:100%; box-sizing:border-box; font-size:14px; padding:8px 10px;
     border:1px solid #ccc; border-radius:8px; margin-bottom:8px; font-family:inherit; }
-  .introPrev img{ width:100%; max-width:280px; height:120px; object-fit:cover; border-radius:8px; background:#eee; }
+  .introPrev{ display:flex; gap:8px; }
+  .introPrev img{ width:100%; max-width:180px; height:120px; object-fit:contain; border-radius:8px; background:#eee; }
   .save{ background:#2e7d32 !important; }
   .roster{ list-style:none; margin:0 0 20px; padding:0; background:#fff; border:1px solid var(--line);
     border-radius:10px; overflow:hidden; }
@@ -272,16 +273,17 @@
     const m=u.match(/\/d\/([-\w]{20,})/)||u.match(/[?&]id=([-\w]{20,})/);
     return m ? ("https://drive.google.com/thumbnail?id="+m[1]+"&sz=w600") : u;
   }
-  let introData = [];   // [{id,name,intro,img}]
+  let introData = [];   // [{id,name,intro,img,img2}]
   async function loadIntroAdmin(){
     let map={};
     try{
       const url=CONFIG.GAS_URL+(CONFIG.GAS_URL.includes("?")?"&":"?")+"type=intro&_="+Date.now();
       const j=await (await fetch(url)).json();
-      (j.intro||[]).forEach(r=>{ map[r.id]={intro:r.intro||"",img:r.img||""}; });
+      (j.intro||[]).forEach(r=>{ map[r.id]={intro:r.intro||"",img:r.img||"",img2:r.img2||""}; });
     }catch(e){}
     introData = CONFIG.MIKOSHI.map(m=>({ id:m.id, name:m.name,
-      intro:(map[m.id]?map[m.id].intro:""), img:(map[m.id]?map[m.id].img:"") }));
+      intro:(map[m.id]?map[m.id].intro:""), img:(map[m.id]?map[m.id].img:""),
+      img2:(map[m.id]?map[m.id].img2:"") }));
     renderIntro();
   }
   function renderIntro(){
@@ -291,8 +293,12 @@
       card.innerHTML=
         '<div class="introName">'+m.name+' <span class="introId">'+m.id+'</span></div>'+
         '<textarea data-intro="'+i+'" rows="2" placeholder="紹介文（例：担ぎ手の掛け声と勇壮な差し上げが見どころ）">'+ (m.intro||"") +'</textarea>'+
-        '<input type="text" data-img="'+i+'" placeholder="画像URL（Googleドライブの共有リンクを貼り付け）" value="'+ (m.img||"").replace(/"/g,'&quot;') +'">'+
-        '<div class="introPrev"><img data-prev="'+i+'" src="'+ (m.img?driveImg(m.img):"") +'" alt="" '+(m.img?"":"style=display:none")+'></div>';
+        '<input type="text" data-img="'+i+'" placeholder="画像URL①（Googleドライブの共有リンクを貼り付け）" value="'+ (m.img||"").replace(/"/g,'&quot;') +'">'+
+        '<input type="text" data-img2="'+i+'" placeholder="画像URL②（2枚目・空欄なら1枚だけ表示）" value="'+ (m.img2||"").replace(/"/g,'&quot;') +'">'+
+        '<div class="introPrev">'+
+          '<img data-prev="'+i+'" src="'+ (m.img?driveImg(m.img):"") +'" alt="" '+(m.img?"":"style=display:none")+'>'+
+          '<img data-prev2="'+i+'" src="'+ (m.img2?driveImg(m.img2):"") +'" alt="" '+(m.img2?"":"style=display:none")+'>'+
+        '</div>';
       box.appendChild(card);
     });
     box.querySelectorAll("[data-intro]").forEach(t=>t.oninput=()=>{ introData[+t.dataset.intro].intro=t.value; });
@@ -301,11 +307,16 @@
       const pv=box.querySelector('[data-prev="'+i+'"]'); const u=driveImg(inp.value);
       if(u){ pv.src=u; pv.style.display=""; } else { pv.style.display="none"; }
     });
+    box.querySelectorAll("[data-img2]").forEach(inp=>inp.oninput=()=>{
+      const i=+inp.dataset.img2; introData[i].img2=inp.value;
+      const pv=box.querySelector('[data-prev2="'+i+'"]'); const u=driveImg(inp.value);
+      if(u){ pv.src=u; pv.style.display=""; } else { pv.style.display="none"; }
+    });
   }
   async function saveIntro(){
     const pw=$("pw").value.trim();
     if(!pw){ $("pw").classList.add("bad"); $("pw").focus(); setAlert("⚠ 先に管理パスワードを入力してください（上の入力欄）","err"); return; }
-    const items=introData.map(m=>({ id:m.id, intro:m.intro||"", img:m.img||"" }));
+    const items=introData.map(m=>({ id:m.id, intro:m.intro||"", img:m.img||"", img2:m.img2||"" }));
     setAlert("保存中…","info");
     try{
       const body=JSON.stringify({action:"saveIntro",adminKey:pw,items:items});
