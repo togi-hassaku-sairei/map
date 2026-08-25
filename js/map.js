@@ -125,6 +125,17 @@ function dirBtn(lat, lng){
     'target="_blank" rel="noopener">経路（Googleマップ）</a></div>';
 }
 
+/* 紹介写真（最大2枚）。2枚あるときは横並び。縦写真・横写真どちらも全体が見える */
+function imgsHtml(d, cls){
+  const list = [d.img, d.img2].filter(function(u){ return u; });
+  if (!list.length) return "";
+  let h = '<div class="' + cls + (list.length > 1 ? " two" : "") + '">';
+  list.forEach(function(u){
+    h += '<figure><img src="' + escH(u) + '" alt="" loading="lazy"></figure>';
+  });
+  return h + "</div>";
+}
+
 /* ポップアップの中身 */
 function popupHtml(m, c){
   if (!c.known) return '<div class="pop"><b>' + m.name + "</b><div class='line'>まだ位置を受信していません</div></div>";
@@ -132,7 +143,7 @@ function popupHtml(m, c){
   let html = '<div class="pop"><b>' + m.name + "</b>";
   if (PREMODE){
     html += descBlock(m, d);
-    if (d.img)  html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
+    html += imgsHtml(d, "pop-img");
     html += dirBtn(d.lat, d.lng) + "</div>";
     return html;
   }
@@ -145,7 +156,7 @@ function popupHtml(m, c){
   }
   const batText = BAT_LABEL[Number(d.bat)];
   if (batText) html += '<div class="line">' + batText + "</div>";
-  if (d.img) html += '<div class="pop-img"><img src="' + d.img + '" alt="" loading="lazy"></div>';
+  html += imgsHtml(d, "pop-img");
   html += dirBtn(d.lat, d.lng) + "</div>";
   return html;
 }
@@ -184,7 +195,7 @@ function updateMarkers(){
     const pos = [c.d.lat, c.d.lng];
     if (!markers[m.id]){
       markers[m.id] = L.marker(pos, { icon: makeIcon(m, c.offline) }).addTo(map);
-      markers[m.id].bindPopup(popupHtml(m, c), { autoPan: false });
+      markers[m.id].bindPopup(popupHtml(m, c), { autoPan: false, maxWidth: 320, maxHeight: 520 });
       markers[m.id]._offState = c.offline;
     } else {
       markers[m.id].setLatLng(pos);
@@ -405,6 +416,43 @@ document.getElementById("locateBtn").addEventListener("click", locateMe);
   renderChecks();
 })();
 
+/* ===== ふきだしを開いている間は地図の操作アイコンを隠す =====
+   検索から地区を選んだとき・アイコンを直接タップしたとき、
+   縮尺(＋/−)・現在地・地図切替がふきだしに重なって読みにくいため。
+   ふきだしを閉じる（地図をタップ／✕）と元に戻る。 */
+function mapFocus(on){
+  const layout = document.querySelector(".layout");
+  if (layout) layout.classList.toggle("map-focus", on);
+  if (on){                                   // レイヤー選択が開いていたら閉じておく
+    const lp = document.getElementById("layerPanel");
+    const lb = document.getElementById("layerBtn");
+    if (lp) lp.classList.remove("open");
+    if (lb) lb.classList.remove("on");
+  }
+}
+map.on("popupopen", function(e){
+  mapFocus(true);
+  /* ふきだしが上部バーで切れないよう、開いた瞬間だけ中央に収める
+     （autoPan は5秒ごとの更新でも地図が動いてしまうので使わない） */
+  function fit(){
+    const box = e.popup && e.popup._container;
+    if (!box) return;
+    const px = map.project(e.popup.getLatLng());
+    px.y -= box.clientHeight / 2;
+    map.panTo(map.unproject(px), { animate:true });
+  }
+  fit();
+  // 写真は少し遅れて読み込まれ、ふきだしの高さが変わるので測り直す
+  const box = e.popup && e.popup._container;
+  if (box){
+    box.querySelectorAll("img").forEach(function(im){
+      if (!im.complete) im.addEventListener("load", fit, { once:true });
+    });
+  }
+  setTimeout(fit, 500);
+});
+map.on("popupclose", function(){ mapFocus(false); });
+
 setInterval(() => { const _c=document.getElementById("clock"); if(_c) _c.textContent = clock(Date.now()); }, 1000);
 
 /* 30秒ごとに更新（経過時間表示は5秒ごとに再計算） */
@@ -429,7 +477,7 @@ function escH(s){
 
 /* ポップアップ用：紹介文は冒頭だけ＋「詳しく見る」 */
 function descBlock(m, d){
-  if (!d.desc && !d.img) return "";
+  if (!d.desc && !d.img && !d.img2) return "";
   let h = "";
   if (d.desc){
     const flat  = String(d.desc).replace(/\s+/g, " ").trim();
@@ -450,11 +498,11 @@ function openDetail(id){
   const body = document.getElementById("sheetBody");
   body.innerHTML = "";
 
-  if (d.img){
-    const fig = document.createElement("div"); fig.className = "sheet-img";
-    const im  = document.createElement("img");
-    im.src = d.img; im.alt = ""; im.loading = "lazy";
-    fig.appendChild(im); body.appendChild(fig);
+  const imgs = imgsHtml(d, "sheet-img");
+  if (imgs){
+    const wrap = document.createElement("div");
+    wrap.innerHTML = imgs;
+    body.appendChild(wrap.firstChild);
   }
   if (d.desc){
     const p = document.createElement("p");
