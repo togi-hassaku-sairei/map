@@ -572,3 +572,27 @@ document.addEventListener("click", function(ev){
 document.addEventListener("keydown", function(ev){
   if (ev.key === "Escape") closeDetail();
 });
+
+/* ===== 起動時スプラッシュ（最低2秒表示し、データ取得後に消す） ===== */
+const SPLASH_MS = 2000;                 // 尺（ミリ秒）。ここを変えれば長さを調整できる
+let   __splashDone = false, __splashReady = false;
+const __splashT0 = Date.now();
+
+/* データの初回取得が終わったら呼ぶ（fetchData から呼び出す） */
+function splashReady(){ __splashReady = true; }
+
+(function splashWatch(){
+  if (__splashDone) return;
+  const el = document.getElementById("splash");
+  if (!el){ __splashDone = true; return; }
+  if (__splashReady && (Date.now() - __splashT0) >= SPLASH_MS){
+    __splashDone = true;
+    el.classList.add("hide");
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 600);
+    return;
+  }
+  setTimeout(splashWatch, 80);
+})();
+
+/* 保険：6秒経っても取得が終わらなければ強制的に消す（通信不良でも地図は触れる） */
+setTimeout(splashReady, 6000);
