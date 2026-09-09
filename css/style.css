@@ -323,3 +323,49 @@ body{
   .detail-sheet.open{ transform:translate(-50%,-50%); opacity:1; visibility:visible; }
   .sheet-grip{ display:none; }
 }
+
+/* ===== 起動時スプラッシュ（2秒） ===== */
+.splash{
+  position:fixed; inset:0; z-index:3000;
+  display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at center,#1c1a24 0%,#0b0a0f 100%);
+  opacity:1; transition:opacity .55s ease;
+}
+.splash.hide{ opacity:0; pointer-events:none; }
+
+.splash-inner{ width:min(92vw,900px); text-align:center; }
+
+.splash-img{
+  display:block; width:100%; height:auto;
+  max-height:62vh; object-fit:contain;
+  border-radius:6px;
+  box-shadow:0 10px 40px rgba(0,0,0,.6);
+  animation: splashIn 2s cubic-bezier(.22,.68,.28,1) both;
+}
+@keyframes splashIn{
+  0%   { opacity:0; transform:scale(1.10); filter:brightness(.6) saturate(.75); }
+  45%  { opacity:1; }
+  100% { opacity:1; transform:scale(1);    filter:brightness(1) saturate(1); }
+}
+
+.splash-bar{
+  margin:22px auto 0; width:min(70%,320px); height:3px;
+  background:rgba(255,255,255,.18); border-radius:2px; overflow:hidden;
+}
+.splash-bar span{
+  display:block; width:0; height:100%;
+  background:linear-gradient(90deg,#ffd400,#ff8a3d);
+  animation: splashBar 2s ease-out both;
+}
+@keyframes splashBar{ from{ width:0; } to{ width:100%; } }
+
+.splash-note{
+  margin-top:12px; color:rgba(255,255,255,.75);
+  font-size:12px; letter-spacing:.08em;
+}
+
+/* 動きを減らす設定の端末では静止表示にする */
+@media (prefers-reduced-motion: reduce){
+  .splash-img{ animation:none; opacity:1; }
+  .splash-bar span{ animation-duration:.4s; }
+}
