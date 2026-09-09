@@ -328,12 +328,25 @@ body{
 .splash{
   position:fixed; inset:0; z-index:3000;
   display:flex; align-items:center; justify-content:center;
-  background:radial-gradient(ellipse at center,#1c1a24 0%,#0b0a0f 100%);
+  overflow:hidden; background:#0b0a0f;
   opacity:1; transition:opacity .55s ease;
 }
 .splash.hide{ opacity:0; pointer-events:none; }
 
-.splash-inner{ width:min(92vw,900px); text-align:center; }
+/* 同じ写真を大きくぼかして背景に敷く（上下の黒帯を埋める） */
+.splash::before{
+  content:""; position:absolute; inset:-60px; z-index:0;
+  background:url(../img/splash.jpg) center/cover no-repeat;
+  filter:blur(22px) brightness(.78) saturate(1.2);
+  transform:scale(1.15);
+}
+/* 周辺を落として中央の写真を引き立てる */
+.splash::after{
+  content:""; position:absolute; inset:0; z-index:1;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.05) 30%,rgba(0,0,0,.62) 100%);
+}
+
+.splash-inner{ position:relative; z-index:2; width:min(92vw,900px); text-align:center; }
 
 .splash-img{
   display:block; width:100%; height:auto;
