@@ -141,7 +141,7 @@ function imgsHtml(d, cls){
   if (!list.length) return "";
   let h = '<div class="' + cls + (list.length > 1 ? " two" : "") + '">';
   list.forEach(function(u){
-    h += '<figure><img src="' + escH(u) + '" alt="" loading="lazy"></figure>';
+   h += '<figure><img src="' + escH(u) + '" alt=""></figure>';
   });
   return h + "</div>";
 }
@@ -347,6 +347,7 @@ async function fetchData(){
     updateMarkers();
     updateList();
     rippleTargets.forEach(id => rippleMarker(id));   // 動き出した神輿だけ波紋
+    preloadIntroImages();                            // 紹介写真を裏で先読み
 
     document.getElementById("foot").textContent = "最終取得：" + clock(Date.now());
     banner(false);
@@ -611,3 +612,20 @@ function splashReady(){ __splashReady = true; }
 
 /* 保険：6秒経っても取得が終わらなければ強制的に消す（通信不良でも地図は触れる） */
 setTimeout(splashReady, 6000);
+
+/* ===== 紹介写真の先読み =====
+   タップされる前に読み込んでキャッシュへ入れておく。
+   同じURLは二度読まないので、30秒ごとの更新で通信は増えない。 */
+const __imgPreloaded = {};
+function preloadIntroImages(){
+  Object.keys(state).forEach(function(id){
+    const d = state[id]; if (!d) return;
+    [d.img, d.img2].forEach(function(u){
+      if (!u || __imgPreloaded[u]) return;
+      __imgPreloaded[u] = true;
+      const im = new Image();
+      im.decoding = "async";
+      im.src = u;
+    });
+  });
+}
