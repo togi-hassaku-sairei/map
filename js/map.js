@@ -350,6 +350,7 @@ async function fetchData(){
 
     document.getElementById("foot").textContent = "最終取得：" + clock(Date.now());
     banner(false);
+    splashReady();
   }catch(e){
     banner(true, "サーバーに接続できません（自動で再試行します）");
     updateList();
