@@ -354,6 +354,7 @@ async function fetchData(){
   }catch(e){
     banner(true, "サーバーに接続できません（自動で再試行します）");
     updateList();
+    splashReady();
   }
 }
 
