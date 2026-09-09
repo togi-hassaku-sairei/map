@@ -17,7 +17,7 @@ map.on("click", function(){
 
 /* ベースマップ（標準地図＝OpenStreetMap／航空写真＝国土地理院シームレス空中写真） */
 const baseLayers = {
-  std: L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+  std: L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
     maxNativeZoom: 18, maxZoom: 19,
     attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル（淡色地図）</a>'
   }),
